@@ -48,8 +48,8 @@ export default function LoginPage() {
           <div className="mx-auto w-16 h-16 bg-white/10 rounded-xl flex items-center justify-center mb-4 backdrop-blur-sm border border-white/20">
             <Shield size={32} className="text-white" />
           </div>
-          <h1 className="text-2xl font-black text-white tracking-tight">GeoGestión</h1>
-          <p className="text-white/60 text-sm mt-2 font-medium">Control Institucional del Estado</p>
+          <h1 className="text-2xl font-black text-white tracking-tight">COP</h1>
+          <p className="text-white/60 text-sm mt-2 font-medium">Control de Operaciones Públicas</p>
         </div>
 
         {/* Formulario */}

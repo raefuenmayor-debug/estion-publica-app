@@ -5,7 +5,7 @@ import "./globals.css";
 const inter = Inter({ subsets: ["latin"] });
 
 export const metadata: Metadata = {
-  title: "Sistema de Control de Gestión - Monday Style",
+  title: "COP - Control de Operaciones Públicas",
   description: "Plataforma SaaS para la gestión de expedientes y bienes públicos",
 };
 
@@ -24,7 +24,7 @@ export default function RootLayout({
               <span className="text-xl font-black tracking-tight text-white flex items-center gap-2">
                 <div className="w-4 h-4 rounded bg-monday-yellow"></div>
                 <div className="w-4 h-4 rounded bg-monday-green -ml-4 mt-4"></div>
-                GeoGestión
+                COP
               </span>
             </div>
             
@@ -48,7 +48,7 @@ export default function RootLayout({
                 <div className="w-8 h-8 rounded-full bg-gradient-to-tr from-purple-500 to-blue-500 flex items-center justify-center text-sm font-bold shadow-lg">A</div>
                 <div className="flex flex-col">
                   <span className="text-sm font-medium">Administrador</span>
-                  <span className="text-xs text-white/50">Admin Total</span>
+                  <span className="text-xs text-white/50">COP Admin</span>
                 </div>
               </div>
             </div>
@@ -58,12 +58,9 @@ export default function RootLayout({
           <main className="flex-1 flex flex-col overflow-hidden bg-white rounded-tl-2xl shadow-[-10px_0_15px_-3px_rgba(0,0,0,0.05)] ml-[-10px] z-10 transition-all duration-300">
             {/* Header */}
             <header className="h-16 flex items-center justify-between px-8 border-b border-gray-100 bg-white">
-              <h1 className="text-2xl font-bold text-slate-800">Contrataciones Públicas</h1>
+              <h1 className="text-2xl font-bold text-slate-800">Control de Operaciones Públicas (COP)</h1>
               <div className="flex items-center gap-4">
-                <button className="px-4 py-2 bg-monday-green text-white text-sm font-medium rounded-md shadow-sm hover:bg-opacity-90 transition-all flex items-center gap-2">
-                  <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="12" x2="12" y1="5" y2="19"/><line x1="5" x2="19" y1="12" y2="12"/></svg>
-                  Nueva Tarea
-                </button>
+                {/* Removí el botón "Nueva Tarea" estático de aquí para no confundir con el botón dinámico del tablero */}
               </div>
             </header>
             
