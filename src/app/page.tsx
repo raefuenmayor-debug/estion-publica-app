@@ -31,6 +31,7 @@ export default function Home() {
   // Estados del Drag and Drop
   const [isDragging, setIsDragging] = useState(false);
   const [files, setFiles] = useState<File[]>([]);
+  const [archivosSubidosCount, setArchivosSubidosCount] = useState(0);
   const fileInputRef = React.useRef<HTMLInputElement>(null);
 
   const handleFileInput = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -65,12 +66,13 @@ export default function Home() {
     e.preventDefault();
     setIsDragging(false);
     if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
-      setFiles(Array.from(e.dataTransfer.files));
+      setFiles(prev => [...prev, ...Array.from(e.dataTransfer.files)]);
     }
   };
 
   const uploadToStorage = () => {
-    alert("Simulando subida segura a Supabase Storage con RLS vigente...");
+    // Al presionar el botón de Subir a la Bóveda
+    setArchivosSubidosCount(prev => prev + files.length);
     setIsFileModalOpen(false);
     setFiles([]);
   };
@@ -137,12 +139,21 @@ export default function Home() {
               Culminada
             </div>
             <div className="w-[150px] flex items-center justify-center bg-gray-50 group-hover:bg-white transition-colors">
-              <button 
-                onClick={() => setIsFileModalOpen(true)}
-                className="text-xs flex items-center gap-1.5 font-bold px-3 py-1.5 my-1 bg-monday-green/10 text-monday-green rounded-md hover:bg-monday-green/20 transition-all border border-monday-green/20"
-              >
-                <FileText size={14} /> Anexar PDFs
-              </button>
+              {archivosSubidosCount > 0 ? (
+                <button 
+                  onClick={() => setIsFileModalOpen(true)}
+                  className="text-xs flex items-center gap-1.5 font-bold px-3 py-1.5 my-1 bg-blue-100 text-blue-700 rounded-md hover:bg-blue-200 transition-all border border-blue-200"
+                >
+                  <FileText size={14} /> {archivosSubidosCount} Archivos Listos
+                </button>
+              ) : (
+                <button 
+                  onClick={() => setIsFileModalOpen(true)}
+                  className="text-xs flex items-center gap-1.5 font-bold px-3 py-1.5 my-1 bg-monday-green/10 text-monday-green rounded-md hover:bg-monday-green/20 transition-all border border-monday-green/20"
+                >
+                  <FileText size={14} /> Anexar PDFs
+                </button>
+              )}
             </div>
           </div>
 
