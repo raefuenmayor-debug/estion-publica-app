@@ -31,6 +31,13 @@ export default function Home() {
   // Estados del Drag and Drop
   const [isDragging, setIsDragging] = useState(false);
   const [files, setFiles] = useState<File[]>([]);
+  const fileInputRef = React.useRef<HTMLInputElement>(null);
+
+  const handleFileInput = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (e.target.files && e.target.files.length > 0) {
+      setFiles(prev => [...prev, ...Array.from(e.target.files!)]);
+    }
+  };
 
   const toggleDoc = (id: number) => {
     setSelectedDocs(prev => prev.includes(id) ? prev.filter(d => d !== id) : [...prev, id]);
@@ -282,7 +289,21 @@ export default function Home() {
               <div className="mt-6 flex items-center gap-3">
                  <div className="h-px w-10 bg-gray-300"></div><span className="text-xs text-gray-500 uppercase font-bold">o</span><div className="h-px w-10 bg-gray-300"></div>
               </div>
-              <button type="button" className="mt-4 px-4 py-2 border border-gray-300 text-slate-700 font-semibold text-sm rounded-lg hover:bg-gray-100">Explorar mi Mac</button>
+              <input 
+                type="file" 
+                ref={fileInputRef} 
+                onChange={handleFileInput} 
+                className="hidden" 
+                multiple 
+                accept=".pdf,.csv,.xlsx,.xls,.png,.jpg"
+              />
+              <button 
+                type="button" 
+                onClick={() => fileInputRef.current?.click()}
+                className="mt-4 px-4 py-2 border border-gray-300 text-slate-700 font-semibold text-sm rounded-lg hover:bg-gray-100 transition-colors"
+              >
+                Explorar mi Mac
+              </button>
             </div>
 
             {/* Archivos Seleccionados */}
