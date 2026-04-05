@@ -3,8 +3,8 @@
 import React, { useState, useMemo } from 'react';
 import { Plus, X, Search, Filter, FileText, CheckCircle2, Circle, UploadCloud, File, LayoutGrid, Package, ChevronDown, ChevronRight, Trash2, Users } from 'lucide-react';
 
-// Checklist legal LCP base
-const DOCUMENTOS_LCP = [
+type DocumentoLCP = { id: number; name: string; category: string; };
+const DOCUMENTOS_LCP: DocumentoLCP[] = [
   { id: 1, name: "Solicitud de la unidad usuaria", category: "Inicio" },
   { id: 2, name: "Disponibilidad Presupuestaria", category: "Inicio" },
   { id: 3, name: "Autorización de Inicio", category: "Inicio" },
@@ -15,16 +15,17 @@ const DOCUMENTOS_LCP = [
   { id: 14, name: "Contrato o Módulo SUCOP", category: "Formalización" }
 ];
 
-const ANALISTAS = [
+type AnalistaType = { id: number; nombre: string; iniciales: string; color: string; };
+const ANALISTAS: AnalistaType[] = [
   { id: 1, nombre: "María Pérez", iniciales: "MP", color: "bg-pink-500" },
   { id: 2, nombre: "Carlos López", iniciales: "CL", color: "bg-cyan-500" },
   { id: 3, nombre: "Ana Gómez", iniciales: "AG", color: "bg-amber-500" },
   { id: 4, nombre: "Luis Ramírez", iniciales: "LR", color: "bg-teal-500" }
 ];
 
-const TIPOS_BIENES = ["Toma Física / Inventario General", "Ingreso / Alta de Bien", "Desincorporación / Baja", "Traspaso o Transferencia Interna", "Corrección de Seriales"];
+const TIPOS_BIENES: string[] = ["Toma Física / Inventario General", "Ingreso / Alta de Bien", "Desincorporación / Baja", "Traspaso o Transferencia Interna", "Corrección de Seriales"];
 
-const ESTADOS_CICLO = ["Asignada", "En Proceso", "En Revisión", "Culminada"];
+const ESTADOS_CICLO: string[] = ["Asignada", "En Proceso", "En Revisión", "Culminada"];
 const getColorEstado = (estado: string) => {
   switch(estado) {
     case "Asignada": return "bg-gray-400";
@@ -56,7 +57,7 @@ export default function Home() {
       id: 1, 
       nombre: "LP-001 Compra de Insumos Médicos", 
       area: "Contrataciones",
-      analistaId: 1, // Asignado a María Pérez
+      analistaId: 1,
       procesos: [
         { id: 101, nombre: "1. Solicitud U.U.", estado: "Culminada", archivosSubidosCount: 1 },
         { id: 102, nombre: "2. Disponibilidad Presupuestaria", estado: "En Revisión", archivosSubidosCount: 0 }
@@ -65,31 +66,29 @@ export default function Home() {
   ]);
 
   const [expandedRow, setExpandedRow] = useState<number | null>(1);
-  const [isNewTaskModalOpen, setIsNewTaskModalOpen] = useState(false);
-  const [isFileModalOpen, setIsFileModalOpen] = useState(false);
+  const [isNewTaskModalOpen, setIsNewTaskModalOpen] = useState<boolean>(false);
+  const [isFileModalOpen, setIsFileModalOpen] = useState<boolean>(false);
   const [activeIds, setActiveIds] = useState<{expId: number, procId: number} | null>(null);
 
-  // Estados Formulario Expediente
-  const [taskName, setTaskName] = useState("");
+  const [taskName, setTaskName] = useState<string>("");
   const [area, setArea] = useState<"Contrataciones" | "Bienes">("Contrataciones");
   const [selectedAnalista, setSelectedAnalista] = useState<number | "">("");
   const [selectedDocs, setSelectedDocs] = useState<number[]>([]);
-  const [bienesTipo, setBienesTipo] = useState("");
+  const [bienesTipo, setBienesTipo] = useState<string>("");
 
   const toggleDoc = (id: number) => {
-    setSelectedDocs(prev => prev.includes(id) ? prev.filter(d => d !== id) : [...prev, id]);
+    setSelectedDocs((prev: number[]) => prev.includes(id) ? prev.filter((d: number) => d !== id) : [...prev, id]);
   };
 
-  const [newProcessName, setNewProcessName] = useState("");
-  const [isDragging, setIsDragging] = useState(false);
+  const [newProcessName, setNewProcessName] = useState<string>("");
+  const [isDragging, setIsDragging] = useState<boolean>(false);
   const [files, setFiles] = useState<File[]>([]);
   const fileInputRef = React.useRef<HTMLInputElement>(null);
 
-  // Resumen de Cargas por Analista Calculada Dinámicamente
   const cargasPorAnalista = useMemo(() => {
     const cargas: Record<number, number> = {};
-    ANALISTAS.forEach(a => cargas[a.id] = 0);
-    expedientes.forEach(exp => {
+    ANALISTAS.forEach((a: AnalistaType) => cargas[a.id] = 0);
+    expedientes.forEach((exp: ExpedienteType) => {
       if(exp.analistaId) cargas[exp.analistaId]++;
     });
     return cargas;
@@ -101,8 +100,8 @@ export default function Home() {
     let subProcesos: SubProcesoType[] = [];
     
     if(area === "Contrataciones") {
-      subProcesos = selectedDocs.map((docId) => {
-        const docInfo = DOCUMENTOS_LCP.find(d => d.id === docId);
+      subProcesos = selectedDocs.map((docId: number) => {
+        const docInfo = DOCUMENTOS_LCP.find((d: DocumentoLCP) => d.id === docId);
         return {
           id: Date.now() + Math.random(),
           nombre: docInfo ? docInfo.name : "Proceso",
@@ -136,11 +135,11 @@ export default function Home() {
   };
 
   const handleCycleStatus = (expId: number, procId: number) => {
-    setExpedientes(prev => prev.map(exp => {
+    setExpedientes((prev: ExpedienteType[]) => prev.map((exp: ExpedienteType) => {
       if(exp.id !== expId) return exp;
       return {
         ...exp,
-        procesos: exp.procesos.map(proc => {
+        procesos: exp.procesos.map((proc: SubProcesoType) => {
           if(proc.id !== procId) return proc;
           const currentIndex = ESTADOS_CICLO.indexOf(proc.estado);
           const nextIndex = (currentIndex + 1) % ESTADOS_CICLO.length;
@@ -152,7 +151,7 @@ export default function Home() {
 
   const handleCreateSubProceso = (expId: number) => {
     if(!newProcessName.trim()) return;
-    setExpedientes(prev => prev.map(exp => {
+    setExpedientes((prev: ExpedienteType[]) => prev.map((exp: ExpedienteType) => {
       if(exp.id !== expId) return exp;
       return {
         ...exp,
@@ -163,23 +162,33 @@ export default function Home() {
   };
 
   const handleDeleteSubProceso = (expId: number, procId: number) => {
-    setExpedientes(prev => prev.map(exp => {
+    setExpedientes((prev: ExpedienteType[]) => prev.map((exp: ExpedienteType) => {
       if(exp.id !== expId) return exp;
-      return { ...exp, procesos: exp.procesos.filter(p => p.id !== procId) };
+      return { ...exp, procesos: exp.procesos.filter((p: SubProcesoType) => p.id !== procId) };
     }));
   };
 
   const handleFileInput = (e: React.ChangeEvent<HTMLInputElement>) => {
-    if (e.target.files && e.target.files.length > 0) setFiles(prev => [...prev, ...Array.from(e.target.files!)]);
+    if (e.target.files && e.target.files.length > 0) setFiles((prev: File[]) => [...prev, ...Array.from(e.target.files!)]);
+  };
+
+  const onDragOver = (e: React.DragEvent) => { e.preventDefault(); setIsDragging(true); };
+  const onDragLeave = (e: React.DragEvent) => { e.preventDefault(); setIsDragging(false); };
+  const onDrop = (e: React.DragEvent) => {
+    e.preventDefault();
+    setIsDragging(false);
+    if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
+      setFiles((prev: File[]) => [...prev, ...Array.from(e.dataTransfer.files!)]);
+    }
   };
 
   const uploadToStorage = () => {
     if (activeIds !== null) {
-      setExpedientes(prev => prev.map(exp => {
+      setExpedientes((prev: ExpedienteType[]) => prev.map((exp: ExpedienteType) => {
         if (exp.id !== activeIds.expId) return exp;
         return {
           ...exp,
-          procesos: exp.procesos.map(proc => {
+          procesos: exp.procesos.map((proc: SubProcesoType) => {
             if(proc.id !== activeIds.procId) return proc;
             return { ...proc, archivosSubidosCount: proc.archivosSubidosCount + files.length };
           })
@@ -200,7 +209,7 @@ export default function Home() {
           <Users size={16} /> Carga Operativa
         </div>
         <div className="flex gap-3">
-          {ANALISTAS.map(a => (
+          {ANALISTAS.map((a: AnalistaType) => (
             <div key={a.id} className="flex items-center gap-1.5 bg-white border border-gray-200 px-3 py-1.5 rounded-full shadow-sm">
               <div className={`w-5 h-5 rounded-full flex items-center justify-center text-[10px] font-bold text-white ${a.color}`}>{a.iniciales}</div>
               <span className="text-xs font-semibold text-slate-700">{a.nombre.split(' ')[0]}</span>
@@ -241,11 +250,11 @@ export default function Home() {
         </div>
 
         <div className="flex flex-col">
-          {expedientes.map((expediente) => {
+          {expedientes.map((expediente: ExpedienteType) => {
             const isExpanded = expandedRow === expediente.id;
-            const culminados = expediente.procesos.filter(p => p.estado === 'Culminada').length;
+            const culminados = expediente.procesos.filter((p: SubProcesoType) => p.estado === 'Culminada').length;
             const isGlobalCompleted = expediente.procesos.length > 0 && culminados === expediente.procesos.length;
-            const analistaInfo = ANALISTAS.find(a => a.id === expediente.analistaId);
+            const analistaInfo = ANALISTAS.find((a: AnalistaType) => a.id === expediente.analistaId);
 
             return (
               <div key={expediente.id} className="flex flex-col w-full border-b border-gray-200/50 transition-colors">
@@ -297,7 +306,7 @@ export default function Home() {
                       <div className="w-[50px] py-1.5 text-center"></div>
                     </div>
 
-                    {expediente.procesos.map((proceso) => (
+                    {expediente.procesos.map((proceso: SubProcesoType) => (
                       <div key={proceso.id} className="flex w-full group hover:bg-white transition-colors border-b border-gray-200/40 leading-[2.5rem] pl-[50px]">
                         <div className="w-[5px] bg-slate-300 group-hover:bg-indigo-300"></div>
                         <div className="flex-1 px-5 border-r border-gray-200/50 font-medium text-slate-700 text-sm flex items-center gap-2">
@@ -330,7 +339,7 @@ export default function Home() {
                     <div className="flex w-full px-6 pl-[55px] mt-2">
                       <form className="flex w-full items-center gap-2 max-w-lg" onSubmit={(e) => { e.preventDefault(); handleCreateSubProceso(expediente.id); }}>
                          <input type="text" placeholder="+ Nombre del Proceso Administrativo extra..." value={newProcessName} onChange={e => setNewProcessName(e.target.value)} className="flex-1 text-xs px-3 py-1.5 bg-gray-50 border border-dashed border-gray-300 hover:bg-white focus:bg-white text-slate-800 focus:outline-none focus:border-indigo-500 rounded-md transition-colors" />
-                         {newProcessName && <button type="submit" className="text-xs bg-slate-800 text-white font-semibold px-3 py-1.5 rounded-md hover:bg-slate-700">Añadir</button>}
+                         {newProcessName !== "" && <button type="submit" className="text-xs bg-slate-800 text-white font-semibold px-3 py-1.5 rounded-md hover:bg-slate-700">Añadir</button>}
                       </form>
                     </div>
 
@@ -382,7 +391,7 @@ export default function Home() {
                   <label className="block text-sm font-semibold text-slate-700 mb-1.5 focus-within:text-indigo-600">Delegar a Analista Operativo</label>
                   <select value={selectedAnalista} onChange={e => setSelectedAnalista(e.target.value === "" ? "" : Number(e.target.value))} className="w-full px-4 py-2 border border-gray-300 rounded-lg text-slate-800 focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 bg-white">
                     <option value="">-- Sin asignar / Abierto --</option>
-                    {ANALISTAS.map(a => <option key={a.id} value={a.id}>{a.nombre} ({cargasPorAnalista[a.id]} expedientes en curso)</option>)}
+                    {ANALISTAS.map((a: AnalistaType) => <option key={a.id} value={a.id}>{a.nombre} ({cargasPorAnalista[a.id]} expedientes en curso)</option>)}
                   </select>
                 </div>
 
@@ -390,7 +399,7 @@ export default function Home() {
                   <div className="pt-2">
                     <label className="block text-sm font-bold text-slate-800 flex items-center gap-2 mb-2 border-b pb-2">Selecciona la Base del Checklist Legal LCP <span className="text-xs bg-gray-100 text-gray-600 px-2 py-0.5 rounded">{selectedDocs.length} marcados</span></label>
                     <div className="grid grid-cols-2 gap-3 mt-2">
-                      {DOCUMENTOS_LCP.map(doc => {
+                      {DOCUMENTOS_LCP.map((doc: DocumentoLCP) => {
                         const isSelected = selectedDocs.includes(doc.id);
                         return (
                           <div key={doc.id} onClick={() => toggleDoc(doc.id)} className={`flex items-start gap-3 p-3 rounded-lg border cursor-pointer ${isSelected ? 'bg-indigo-50/50 border-indigo-200' : 'bg-white border-gray-200 hover:border-gray-300'}`}>
@@ -408,7 +417,7 @@ export default function Home() {
                     <label className="block text-sm font-bold text-slate-800 mb-2">Clasificación del Movimiento (SUDEBIP)</label>
                     <select required value={bienesTipo} onChange={(e) => setBienesTipo(e.target.value)} className="w-full px-4 py-2 border border-gray-300 rounded-lg text-slate-800 focus:outline-none focus:border-indigo-500 bg-white">
                       <option value="" disabled>Seleccione el tipo de trámite de Bienes...</option>
-                      {TIPOS_BIENES.map(tb => <option key={tb} value={tb}>{tb}</option>)}
+                      {TIPOS_BIENES.map((tb: string) => <option key={tb} value={tb}>{tb}</option>)}
                     </select>
                   </div>
                 )}
@@ -444,7 +453,7 @@ export default function Home() {
 
             {files.length > 0 && (
               <div className="mt-4 space-y-2 max-h-32 overflow-y-auto border border-gray-100 p-2 rounded-lg bg-gray-50">
-                {files.map((file, i) => (
+                {files.map((file: File, i: number) => (
                   <div key={i} className="flex flex-row items-center justify-between p-2 rounded bg-white border border-gray-200 shadow-sm">
                     <div className="flex items-center gap-3"><File size={14} className="text-indigo-600" /><div className="flex flex-col"><span className="text-xs font-bold text-slate-700 truncate w-40">{file.name}</span></div></div>
                     <CheckCircle2 size={16} className="text-emerald-500" />
