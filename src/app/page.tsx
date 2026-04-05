@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState, useMemo } from 'react';
-import { Plus, X, Search, Filter, FileText, CheckCircle2, Circle, UploadCloud, File, AlertCircle, LayoutGrid, Package, ChevronDown, ChevronRight, Trash2, Users } from 'lucide-react';
+import { Plus, X, Search, Filter, FileText, CheckCircle2, Circle, UploadCloud, File, LayoutGrid, Package, ChevronDown, ChevronRight, Trash2, Users } from 'lucide-react';
 
 // Checklist legal LCP base
 const DOCUMENTOS_LCP = [
