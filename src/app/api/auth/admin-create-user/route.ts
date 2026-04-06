@@ -18,29 +18,13 @@ export async function POST(request: Request) {
       }
     )
     
-    // 1. Verificamos quién está llamando a la API
+    // 1. Verificamos quién está llamando a la API (verificando la sesión segura)
     const { data: { session } } = await supabaseClient.auth.getSession()
     if (!session) return NextResponse.json({ error: "No autorizado" }, { status: 401 })
     
-    // 2. Comprobamos que sea el Administrador Supremo real
-    const { data: profile } = await supabaseClient
-      .from('profiles')
-      .select('role')
-      .eq('id', session.user.id)
-      .single()
-
-    if (!profile || profile.role !== 'Administrador') {
-      return NextResponse.json({ 
-        error: `Permisos insuficientes. Tu rol actual es: '${profile?.role || "NINGUNO"}'. Se requiere 'Administrador'` 
-      }, { status: 403 })
-    }
-
-    // 3. Recibimos la data del nuevo usuario a crear
-    const { email, password, nombre, rol, iniciales } = await request.json()
-
-    // 4. Utilizamos la Llave Maestra (Service Role Key) para sortear las políticas de seguridad
+    // 2. Inicializamos la Llave Maestra desde el principio
     if (!process.env.SUPABASE_SERVICE_ROLE_KEY) {
-      return NextResponse.json({ error: "Falta configurar la SUPABASE_SERVICE_ROLE_KEY en el Panel de Environment Variables de Vercel (o .env.local)." }, { status: 500 })
+      return NextResponse.json({ error: "Falta configurar la SUPABASE_SERVICE_ROLE_KEY en Vercel." }, { status: 500 })
     }
 
     const supabaseAdmin = createSupabaseAdmin(
@@ -48,6 +32,22 @@ export async function POST(request: Request) {
       process.env.SUPABASE_SERVICE_ROLE_KEY,
       { auth: { autoRefreshToken: false, persistSession: false } }
     )
+
+    // 3. Comprobamos que sea el Administrador Supremo real (Bypassing RLS con supabaseAdmin)
+    const { data: profile, error: errSelect } = await supabaseAdmin
+      .from('profiles')
+      .select('role')
+      .eq('id', session.user.id)
+      .single()
+
+    if (errSelect || !profile || profile.role !== 'Administrador') {
+      return NextResponse.json({ 
+        error: `Permisos insuficientes. Tu rol actual es: '${profile?.role || "NINGUNO"}'. Se requiere 'Administrador'. (Detalle server: ${errSelect?.message || "Sin fila vinculada"})` 
+      }, { status: 403 })
+    }
+
+    // 4. Recibimos la data del nuevo usuario a crear
+    const { email, password, nombre, rol, iniciales } = await request.json()
 
     // 5. Crear el usuario en la bóveda de "Authentication" de Supabase
     const { data: newUser, error: authError } = await supabaseAdmin.auth.admin.createUser({
