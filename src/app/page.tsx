@@ -1,18 +1,20 @@
 "use client";
 
 import React, { useState, useMemo } from 'react';
-import { Plus, X, Search, Filter, FileText, CheckCircle2, Circle, UploadCloud, File, LayoutGrid, Package, ChevronDown, ChevronRight, Trash2, Users, ShieldCheck, ArrowUp, ArrowDown } from 'lucide-react';
+import { Plus, X, Search, Filter, FileText, CheckCircle2, Circle, UploadCloud, File, LayoutGrid, Package, ChevronDown, ChevronRight, Trash2, Users, ShieldCheck, ArrowUp, ArrowDown, Calculator, AlertTriangle, Info } from 'lucide-react';
 
-type DocumentoLCP = { id: number; name: string; category: string; };
+type TipoFinanciero = "Ninguna" | "Presupuesto Base" | "Adjudicación" | "Disponibilidad" | "Contrato" | "Adenda";
+
+type DocumentoLCP = { id: number; name: string; category: string; preTipo?: TipoFinanciero };
 const DOCUMENTOS_LCP: DocumentoLCP[] = [
-  { id: 1, name: "Solicitud de la unidad usuaria", category: "Inicio" },
-  { id: 2, name: "Disponibilidad Presupuestaria", category: "Inicio" },
-  { id: 3, name: "Autorización de Inicio", category: "Inicio" },
-  { id: 4, name: "Presupuesto Base", category: "Inicio" },
-  { id: 5, name: "Pliego de Condiciones", category: "Inicio" },
-  { id: 10, name: "Informe de Recomendación", category: "Selección" },
-  { id: 11, name: "Adjudicación", category: "Selección" },
-  { id: 14, name: "Contrato o Módulo SUCOP", category: "Formalización" }
+  { id: 1, name: "Solicitud de la unidad usuaria", category: "Inicio", preTipo: "Ninguna" },
+  { id: 2, name: "Disponibilidad Presupuestaria", category: "Inicio", preTipo: "Disponibilidad" },
+  { id: 3, name: "Autorización de Inicio", category: "Inicio", preTipo: "Ninguna" },
+  { id: 4, name: "Presupuesto Base", category: "Inicio", preTipo: "Presupuesto Base" },
+  { id: 5, name: "Pliego de Condiciones", category: "Inicio", preTipo: "Ninguna" },
+  { id: 10, name: "Informe de Recomendación", category: "Selección", preTipo: "Ninguna" },
+  { id: 11, name: "Adjudicación", category: "Selección", preTipo: "Adjudicación" },
+  { id: 14, name: "Contrato o Módulo SUCOP", category: "Formalización", preTipo: "Contrato" }
 ];
 
 type AnalistaType = { id: number; nombre: string; iniciales: string; color: string; };
@@ -43,6 +45,9 @@ type SubProcesoType = {
   vistoBueno: boolean;
   archivosSubidosCount: number;
   fecha?: string;
+  tipoFinanciero?: TipoFinanciero;
+  montoUsd?: number;
+  tasaBcv?: number;
 };
 
 type ExpedienteType = {
@@ -61,8 +66,8 @@ export default function Home() {
       area: "Contrataciones",
       analistaId: 1,
       procesos: [
-        { id: 101, nombre: "1. Solicitud U.U.", estado: "Culminada", vistoBueno: true, archivosSubidosCount: 1, fecha: "2024-03-01" },
-        { id: 102, nombre: "2. Disponibilidad Presupuestaria", estado: "En Revisión", vistoBueno: false, archivosSubidosCount: 0, fecha: "2024-03-05" }
+        { id: 101, nombre: "4. Presupuesto Base", estado: "Culminada", vistoBueno: true, archivosSubidosCount: 1, fecha: "2024-03-01", tipoFinanciero: "Presupuesto Base", montoUsd: 50000, tasaBcv: 36.25 },
+        { id: 102, nombre: "11. Adjudicación", estado: "En Revisión", vistoBueno: false, archivosSubidosCount: 0, fecha: "2024-03-05", tipoFinanciero: "Adjudicación", montoUsd: 0, tasaBcv: 36.25 }
       ] 
     }
   ]);
@@ -85,6 +90,7 @@ export default function Home() {
 
   const [newProcessName, setNewProcessName] = useState<string>("");
   const [newProcessDate, setNewProcessDate] = useState<string>("");
+  const [newProcessFinType, setNewProcessFinType] = useState<TipoFinanciero>("Ninguna");
   
   const [isDragging, setIsDragging] = useState<boolean>(false);
   const [files, setFiles] = useState<File[]>([]);
@@ -107,6 +113,10 @@ export default function Home() {
     return cant;
   }, [expedientes]);
 
+  const getSumaFinanciera = (procesos: SubProcesoType[], tipo: TipoFinanciero) => {
+    return procesos.filter(p => p.tipoFinanciero === tipo).reduce((acc, p) => acc + (p.montoUsd || 0), 0);
+  };
+
   const handleCreateExpediente = (e: React.FormEvent) => {
     e.preventDefault();
     
@@ -121,7 +131,10 @@ export default function Home() {
           estado: "Asignada",
           vistoBueno: false,
           archivosSubidosCount: 0,
-          fecha: ""
+          fecha: "",
+          tipoFinanciero: docInfo?.preTipo || "Ninguna",
+          montoUsd: 0,
+          tasaBcv: 36.25  // Tasa genérica inicial demo
         };
       });
     } else {
@@ -131,7 +144,8 @@ export default function Home() {
         estado: "Asignada",
         vistoBueno: false,
         archivosSubidosCount: 0,
-        fecha: ""
+        fecha: "",
+        tipoFinanciero: "Ninguna"
       }];
     }
 
@@ -192,6 +206,19 @@ export default function Home() {
     }));
   };
 
+  const handleMontoChange = (expId: number, procId: number, field: 'montoUsd' | 'tasaBcv', value: number) => {
+    setExpedientes((prev: ExpedienteType[]) => prev.map((exp: ExpedienteType) => {
+      if(exp.id !== expId) return exp;
+      return {
+        ...exp,
+        procesos: exp.procesos.map((proc: SubProcesoType) => {
+          if(proc.id !== procId) return proc;
+          return { ...proc, [field]: value };
+        })
+      };
+    }));
+  };
+
   const handleMoveProceso = (expId: number, index: number, direction: 'up' | 'down') => {
     setExpedientes((prev: ExpedienteType[]) => prev.map((exp: ExpedienteType) => {
       if(exp.id !== expId) return exp;
@@ -215,11 +242,22 @@ export default function Home() {
       if(exp.id !== expId) return exp;
       return {
         ...exp,
-        procesos: [...exp.procesos, { id: Date.now(), nombre: newProcessName, estado: "Asignada", vistoBueno: false, archivosSubidosCount: 0, fecha: newProcessDate }]
+        procesos: [...exp.procesos, { 
+          id: Date.now(), 
+          nombre: newProcessName, 
+          estado: "Asignada", 
+          vistoBueno: false, 
+          archivosSubidosCount: 0, 
+          fecha: newProcessDate,
+          tipoFinanciero: newProcessFinType,
+          montoUsd: newProcessFinType !== "Ninguna" ? 0 : undefined,
+          tasaBcv: newProcessFinType !== "Ninguna" ? 36.25 : undefined,
+        }]
       };
     }));
     setNewProcessName("");
     setNewProcessDate("");
+    setNewProcessFinType("Ninguna");
   };
 
   const handleDeleteSubProceso = (expId: number, procId: number) => {
@@ -259,6 +297,10 @@ export default function Home() {
     setIsFileModalOpen(false);
     setFiles([]);
     setActiveIds(null);
+  };
+
+  const formatearMonto = (num: number) => {
+    return new Intl.NumberFormat('es-VE', { style: 'currency', currency: 'VEF', minimumFractionDigits: 2 }).format(num).replace('VEF', '');
   };
 
   return (
@@ -333,6 +375,10 @@ export default function Home() {
             const isGlobalCompleted = expediente.procesos.length > 0 && culminados === expediente.procesos.length;
             const analistaInfo = ANALISTAS.find((a: AnalistaType) => a.id === expediente.analistaId);
 
+            const sPresupuesto = getSumaFinanciera(expediente.procesos, "Presupuesto Base");
+            const sAdjudicacion = getSumaFinanciera(expediente.procesos, "Adjudicación");
+            const sDisponibilidades = getSumaFinanciera(expediente.procesos, "Disponibilidad");
+
             return (
               <div key={expediente.id} className="flex flex-col w-full border-b border-gray-200/50 transition-colors">
                 
@@ -385,72 +431,166 @@ export default function Home() {
                       <div className="w-[100px] py-1.5 text-center px-1 text-[10px] flex items-center justify-center">Reorganizar</div>
                     </div>
 
-                    {expediente.procesos.map((proceso: SubProcesoType, pIndex: number) => (
-                      <div key={proceso.id} className="flex w-full group hover:bg-white transition-colors border-b border-gray-200/40 leading-[2.6rem] pl-[50px]">
-                        <div className="w-[5px] bg-slate-300 group-hover:bg-indigo-300"></div>
-                        
-                        {/* Nombre del Proceso */}
-                        <div className="flex-1 px-5 border-r border-gray-200/50 font-medium text-slate-700 text-sm flex items-center gap-2">
-                          <div className="w-2 h-2 rounded-full border border-slate-400"></div>
-                          {proceso.nombre}
-                        </div>
+                    {expediente.procesos.map((proceso: SubProcesoType, pIndex: number) => {
+                      const mUsd = proceso.montoUsd || 0;
+                      const mBs = mUsd * (proceso.tasaBcv || 0);
 
-                        {/* Fecha Setter */}
-                        <div className="w-[130px] border-r border-gray-200/50 flex items-center justify-center bg-gray-100/50 hover:bg-white transition-colors px-1">
-                           <input 
-                             type="date" 
-                             value={proceso.fecha || ""} 
-                             onChange={(e) => handleChangeDate(expediente.id, proceso.id, e.target.value)}
-                             className="text-xs text-slate-700 bg-transparent border border-transparent focus:border-indigo-300 rounded focus:ring-0 max-w-[120px] transition-colors"
-                           />
-                        </div>
-                        
-                        {/* Celda del Visto Bueno (Jefe) */}
-                        <div className="w-[110px] border-r border-gray-200/50 flex items-center justify-center bg-fuchsia-50/10 hover:bg-fuchsia-50 transition-colors">
-                           <button 
-                             onClick={() => handleToggleVistoBueno(expediente.id, proceso.id)} 
-                             className={`text-xs font-bold px-2 py-1 rounded-md border flex items-center gap-1.5 transition-all outline-none ${proceso.vistoBueno ? 'bg-fuchsia-600 text-white border-fuchsia-600' : 'bg-white text-fuchsia-600 border-fuchsia-200 hover:border-fuchsia-400 hover:bg-fuchsia-50'}`}
-                           >
-                             {proceso.vistoBueno ? <CheckCircle2 size={14} /> : <Circle size={14} />} V.B.
-                           </button>
-                        </div>
+                      let errorAlert = null;
+                      if (proceso.tipoFinanciero === "Adjudicación" && mUsd > sPresupuesto) {
+                        errorAlert = "Límite: Supera Presupuesto Base";
+                      } else if (proceso.tipoFinanciero === "Disponibilidad" && sDisponibilidades > sAdjudicacion) {
+                        errorAlert = "Límite: Supera Adjudicación Total";
+                      } else if (proceso.tipoFinanciero === "Contrato" && mUsd > sDisponibilidades) {
+                        errorAlert = "Límite: Supera Disponibilidad";
+                      } else if (proceso.tipoFinanciero === "Adenda" && mUsd > sDisponibilidades) {
+                        errorAlert = "Límite: Sume Adendas > Disponibilidad"; // Ideal checking would be Contrato+Adendas vs Disp, but simplified
+                      }
 
-                        {/* Celda Estado Estándar (Analista) */}
-                        <div onClick={() => handleCycleStatus(expediente.id, proceso.id)} className={`w-[125px] border-r text-xs border-white text-white font-semibold text-center hover:opacity-90 cursor-pointer transition-colors ${getColorEstado(proceso.estado)}`}>
-                          {proceso.estado}
-                        </div>
-                        
-                        {/* Celda Bóveda */}
-                        <div className="w-[130px] flex items-center border-r border-gray-200/50 justify-center group-hover:bg-blue-50/20 transition-colors relative px-2">
-                          {proceso.estado === "Culminada" ? (
-                            proceso.archivosSubidosCount > 0 ? (
-                              <button onClick={() => { setActiveIds({expId: expediente.id, procId: proceso.id}); setIsFileModalOpen(true); }} className="text-xs flex items-center justify-center w-full gap-1.5 font-bold px-2 py-1 my-1 bg-blue-100 text-blue-700 rounded-md hover:bg-blue-200 border border-blue-200"><FileText size={12} /> {proceso.archivosSubidosCount} Ver PDFs</button>
-                            ) : (
-                              <button onClick={() => { setActiveIds({expId: expediente.id, procId: proceso.id}); setIsFileModalOpen(true); }} className="text-xs flex items-center justify-center w-full gap-1.5 font-bold px-2 py-1 my-1 bg-emerald-100 text-emerald-700 rounded-md hover:bg-emerald-200 border border-emerald-200"><FileText size={12} /> Anexar PDF</button>
-                            )
-                          ) : (
-                            <span className="text-[10px] text-gray-400 font-bold uppercase cursor-not-allowed text-center leading-tight mt-1">Status Cero</span>
+                      return (
+                        <React.Fragment key={proceso.id}>
+                          {/* Fila Estándar Del Acto */}
+                          <div className={`flex w-full group transition-colors border-b border-gray-200/40 leading-[2.6rem] pl-[50px] ${proceso.tipoFinanciero !== "Ninguna" ? 'bg-indigo-50/10' : 'hover:bg-white'}`}>
+                            <div className="w-[5px] bg-slate-300 group-hover:bg-indigo-300"></div>
+                            
+                            <div className="flex-1 px-5 border-r border-gray-200/50 font-medium text-slate-700 text-sm flex items-center gap-2">
+                              <div className="w-2 h-2 rounded-full border border-slate-400"></div>
+                              {proceso.nombre}
+                            </div>
+
+                            {/* Fecha Setter */}
+                            <div className="w-[130px] border-r border-gray-200/50 flex items-center justify-center hover:bg-white transition-colors px-1">
+                               <input 
+                                 type="date" 
+                                 value={proceso.fecha || ""} 
+                                 onChange={(e) => handleChangeDate(expediente.id, proceso.id, e.target.value)}
+                                 className="text-xs text-slate-700 bg-transparent border border-transparent focus:border-indigo-300 rounded focus:ring-0 max-w-[120px] transition-colors"
+                               />
+                            </div>
+                            
+                            <div className="w-[110px] border-r border-gray-200/50 flex items-center justify-center bg-fuchsia-50/10 hover:bg-fuchsia-50 transition-colors">
+                               <button 
+                                 onClick={() => handleToggleVistoBueno(expediente.id, proceso.id)} 
+                                 className={`text-xs font-bold px-2 py-1 rounded-md border flex items-center gap-1.5 transition-all outline-none ${proceso.vistoBueno ? 'bg-fuchsia-600 text-white border-fuchsia-600' : 'bg-white text-fuchsia-600 border-fuchsia-200 hover:border-fuchsia-400 hover:bg-fuchsia-50'}`}
+                               >
+                                 {proceso.vistoBueno ? <CheckCircle2 size={14} /> : <Circle size={14} />} V.B.
+                               </button>
+                            </div>
+
+                            <div onClick={() => handleCycleStatus(expediente.id, proceso.id)} className={`w-[125px] border-r text-xs border-white text-white font-semibold text-center hover:opacity-90 cursor-pointer transition-colors ${getColorEstado(proceso.estado)}`}>
+                              {proceso.estado}
+                            </div>
+                            
+                            <div className="w-[130px] flex items-center border-r border-gray-200/50 justify-center group-hover:bg-blue-50/20 transition-colors relative px-2">
+                              {proceso.estado === "Culminada" ? (
+                                proceso.archivosSubidosCount > 0 ? (
+                                  <button onClick={() => { setActiveIds({expId: expediente.id, procId: proceso.id}); setIsFileModalOpen(true); }} className="text-xs flex items-center justify-center w-full gap-1.5 font-bold px-2 py-1 my-1 bg-blue-100 text-blue-700 rounded-md hover:bg-blue-200 border border-blue-200"><FileText size={12} /> {proceso.archivosSubidosCount} Ver PDFs</button>
+                                ) : (
+                                  <button onClick={() => { setActiveIds({expId: expediente.id, procId: proceso.id}); setIsFileModalOpen(true); }} className="text-xs flex items-center justify-center w-full gap-1.5 font-bold px-2 py-1 my-1 bg-emerald-100 text-emerald-700 rounded-md hover:bg-emerald-200 border border-emerald-200"><FileText size={12} /> Anexar PDF</button>
+                                )
+                              ) : (
+                                <span className="text-[10px] text-gray-400 font-bold uppercase cursor-not-allowed text-center leading-tight mt-1">Status Cero</span>
+                              )}
+                            </div>
+
+                            {/* Mecanismos de Reordenamiento y Eliminación */}
+                            <div className="w-[100px] flex items-center justify-center gap-1.5 px-3 bg-gray-50/50 border-gray-100 border-l group-hover:bg-indigo-50/20">
+                              <button onClick={() => handleMoveProceso(expediente.id, pIndex, 'up')} disabled={pIndex === 0} className="text-gray-400 hover:text-indigo-600 hover:bg-indigo-100 p-1 rounded transition-colors disabled:opacity-20"><ArrowUp size={14}/></button>
+                              <button onClick={() => handleMoveProceso(expediente.id, pIndex, 'down')} disabled={pIndex === expediente.procesos.length - 1} className="text-gray-400 hover:text-indigo-600 hover:bg-indigo-100 p-1 rounded transition-colors disabled:opacity-20"><ArrowDown size={14}/></button>
+                              
+                              <div className="w-px h-6 bg-gray-200 mx-1"></div>
+                              
+                              <button onClick={() => handleDeleteSubProceso(expediente.id, proceso.id)} title="Eliminar este Acto" className="text-gray-300 hover:text-red-500 hover:bg-red-50 p-1 rounded transition-colors outline-none"><Trash2 size={15} /></button>
+                            </div>
+                          </div>
+
+                          {/* Sub-Panel Financiero Desplegable para Actos Contables */}
+                          {proceso.tipoFinanciero && proceso.tipoFinanciero !== "Ninguna" && (
+                            <div className={`flex w-full ${errorAlert ? 'bg-red-50/80 shadow-inner' : 'bg-slate-100/60 shadow-inner'} border-b border-gray-200/80 pl-[70px] pr-6 py-2.5 pb-3 transition-colors`}>
+                               <div className={`flex flex-1 flex-wrap lg:flex-nowrap items-center gap-4 px-4 py-2 bg-white border ${errorAlert ? 'border-red-300' : 'border-gray-200'} rounded-lg shadow-sm w-full`}>
+                                  
+                                  {/* Etiqueta */}
+                                  <div className="flex items-center gap-2 w-48 border-r pr-2 border-gray-100">
+                                     <Calculator size={16} className={errorAlert ? "text-red-500" : "text-emerald-600"} />
+                                     <span className="text-xs font-bold text-slate-600 uppercase tracking-wide leading-tight">{proceso.tipoFinanciero}</span>
+                                  </div>
+
+                                  {/* Input Dólares */}
+                                  <div className="flex flex-col flex-1 max-w-[160px]">
+                                      <span className="text-[10px] font-bold uppercase text-gray-500 mb-0.5">Asignación USD ($)</span>
+                                      <div className="relative">
+                                        <span className={`absolute left-2 top-1/2 -translate-y-1/2 font-bold ${errorAlert ? 'text-red-500' : 'text-emerald-600'}`}>$</span>
+                                        <input type="number" 
+                                               value={proceso.montoUsd || ""} 
+                                               onChange={(e) => handleMontoChange(expediente.id, proceso.id, 'montoUsd', Number(e.target.value))}
+                                               className={`w-full text-sm font-semibold pl-6 pr-2 py-1 focus:outline-none focus:ring-1 rounded-md border ${errorAlert ? 'bg-red-50 border-red-300 focus:border-red-500 text-red-900 focus:ring-red-500' : 'bg-gray-50 border-gray-300 focus:border-emerald-500 focus:ring-emerald-500 text-slate-800'}`} />
+                                      </div>
+                                  </div>
+
+                                  <div className="text-gray-300 hidden lg:block"><X size={12} /></div>
+
+                                  {/* Input Tasa */}
+                                  <div className="flex flex-col flex-1 max-w-[120px]">
+                                      <span className="text-[10px] font-bold uppercase text-gray-500 mb-0.5">Tasa BCV (Bs/$)</span>
+                                      <div className="relative">
+                                        <input type="number" 
+                                               value={proceso.tasaBcv || ""} 
+                                               onChange={(e) => handleMontoChange(expediente.id, proceso.id, 'tasaBcv', Number(e.target.value))}
+                                               className="w-full text-sm font-semibold px-2 py-1 bg-gray-50 border border-gray-300 focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 rounded-md text-slate-800" />
+                                      </div>
+                                  </div>
+
+                                  <div className="font-bold text-gray-300 hidden lg:block">=</div>
+
+                                  {/* Resultado BS */}
+                                  <div className="flex flex-col flex-1 max-w-[160px] bg-slate-50 border border-slate-200 px-3 py-1.5 rounded-md">
+                                      <span className="text-[10px] font-bold uppercase text-slate-500 mb-0.5">Total Bolívares (Bs)</span>
+                                      <span className="text-sm font-black text-slate-800">Bs. {formatearMonto(mBs)}</span>
+                                  </div>
+
+                                  {/* Warning Condicional */}
+                                  {errorAlert && (
+                                    <div className="flex items-center gap-1.5 ml-auto text-xs font-bold text-red-600 bg-red-50 border border-red-200 px-3 py-1.5 rounded flex-shrink-0 animate-pulse">
+                                       <AlertTriangle size={14} /> {errorAlert}
+                                    </div>
+                                  )}
+                                  
+                                  {!errorAlert && proceso.montoUsd! > 0 && (
+                                    <div className="flex items-center gap-1.5 ml-auto text-xs font-bold text-emerald-600 bg-emerald-50 border border-emerald-200 px-3 py-1.5 rounded flex-shrink-0">
+                                       <CheckCircle2 size={14} /> Aprobado Contablemente
+                                    </div>
+                                  )}
+                               </div>
+                            </div>
                           )}
-                        </div>
+                        </React.Fragment>
+                      );
+                    })}
 
-                        {/* Mecanismos de Reordenamiento y Eliminación */}
-                        <div className="w-[100px] flex items-center justify-center gap-1.5 px-3 bg-gray-50/50 border-gray-100 border-l group-hover:bg-indigo-50/20">
-                          <button onClick={() => handleMoveProceso(expediente.id, pIndex, 'up')} disabled={pIndex === 0} className="text-gray-400 hover:text-indigo-600 hover:bg-indigo-100 p-1 rounded transition-colors disabled:opacity-20"><ArrowUp size={14}/></button>
-                          <button onClick={() => handleMoveProceso(expediente.id, pIndex, 'down')} disabled={pIndex === expediente.procesos.length - 1} className="text-gray-400 hover:text-indigo-600 hover:bg-indigo-100 p-1 rounded transition-colors disabled:opacity-20"><ArrowDown size={14}/></button>
-                          
-                          <div className="w-px h-6 bg-gray-200 mx-1"></div>
-                          
-                          <button onClick={() => handleDeleteSubProceso(expediente.id, proceso.id)} title="Eliminar este Acto" className="text-gray-300 hover:text-red-500 hover:bg-red-50 p-1 rounded transition-colors outline-none"><Trash2 size={15} /></button>
-                        </div>
-                      </div>
-                    ))}
+                    <div className="flex w-full px-6 pl-[55px] mt-4">
+                      <form className="flex w-full items-center gap-3 bg-indigo-50/50 p-3 rounded-lg border border-indigo-100 shadow-sm" onSubmit={(e) => { e.preventDefault(); handleCreateSubProceso(expediente.id); }}>
+                         <div className="flex flex-col">
+                           <span className="text-[10px] font-bold uppercase text-indigo-800 ml-1 mb-1">Nombre Libre</span>
+                           <input type="text" placeholder="Ej. Presentación Oficio Legal" value={newProcessName} onChange={e => setNewProcessName(e.target.value)} className="w-[300px] text-xs px-3 py-2 bg-white border border-gray-300 focus:outline-none focus:border-indigo-500 rounded-md transition-colors shadow-sm" />
+                         </div>
+                         
+                         <div className="flex flex-col">
+                           <span className="text-[10px] font-bold uppercase text-indigo-800 ml-1 mb-1">Fecha</span>
+                           <input type="date" value={newProcessDate} onChange={e => setNewProcessDate(e.target.value)} title="Fecha Estimada" className="w-[125px] text-xs px-3 py-2 bg-white border border-gray-300 text-slate-700 focus:outline-none focus:border-indigo-500 rounded-md shadow-sm transition-colors cursor-pointer" />
+                         </div>
 
-                    <div className="flex w-full px-6 pl-[55px] mt-3">
-                      <form className="flex w-full items-center gap-3 bg-indigo-50/50 p-2 rounded-lg border border-indigo-100" onSubmit={(e) => { e.preventDefault(); handleCreateSubProceso(expediente.id); }}>
-                         <span className="text-xs font-bold text-indigo-800 ml-2">Extra:</span>
-                         <input type="text" placeholder="Nombre de nuevo Acto Jurídico..." value={newProcessName} onChange={e => setNewProcessName(e.target.value)} className="flex-1 text-xs px-3 py-1.5 bg-white border border-gray-300 focus:outline-none focus:border-indigo-500 rounded-md transition-colors shadow-sm" />
-                         <input type="date" value={newProcessDate} onChange={e => setNewProcessDate(e.target.value)} title="Fecha Estimada Inicial" className="w-[140px] text-xs px-3 py-1.5 bg-white border border-gray-300 text-slate-700 focus:outline-none focus:border-indigo-500 rounded-md shadow-sm transition-colors cursor-pointer" />
-                         <button type="submit" disabled={!newProcessName} className="text-xs bg-indigo-600 text-white font-bold px-4 py-1.5 rounded-md hover:bg-indigo-700 shadow-sm disabled:opacity-50">Inyectar Acto</button>
+                         <div className="flex flex-col flex-1 pl-2 border-l border-indigo-200">
+                           <span className="text-[10px] font-bold uppercase text-indigo-800 ml-1 mb-1 flex items-center gap-1"><Calculator size={10} /> Naturaleza Financiera</span>
+                           <select value={newProcessFinType} onChange={e => setNewProcessFinType(e.target.value as TipoFinanciero)} className="w-full text-xs px-3 py-2 bg-white border border-gray-300 text-slate-700 focus:outline-none focus:border-indigo-500 rounded-md shadow-sm">
+                             <option value="Ninguna">-- Actividad Regular --</option>
+                             <option value="Presupuesto Base">Monto Madre: Presupuesto Base ($)</option>
+                             <option value="Adjudicación">Monto Aprobado: Adjudicación ($)</option>
+                             <option value="Disponibilidad">Bloqueo: Disponibilidad Acumulativa ($)</option>
+                             <option value="Contrato">Monto Legal: Contrato Oficial ($)</option>
+                             <option value="Adenda">Anexo: Adenda Cuentas Extra ($)</option>
+                           </select>
+                         </div>
+                         
+                         <button type="submit" disabled={!newProcessName} className="text-xs bg-indigo-600 text-white font-bold px-6 py-2 h-max self-end rounded-md hover:bg-indigo-700 shadow-sm disabled:opacity-50 mt-4">Inyectar Acto</button>
                       </form>
                     </div>
 
@@ -470,7 +610,6 @@ export default function Home() {
         </div>
       </div>
 
-      {/* MODAL 1: Nuevo Expediente */}
       {isNewTaskModalOpen && (
         <div className="absolute z-50 inset-0 -mx-8 -my-8 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center">
           <div className="bg-white rounded-2xl shadow-2xl w-[600px] flex flex-col animate-in fade-in zoom-in-95 duration-200">
@@ -510,13 +649,20 @@ export default function Home() {
                 {area === 'Contrataciones' && (
                   <div className="pt-2">
                     <label className="block text-sm font-bold text-slate-800 flex items-center gap-2 mb-2 border-b pb-2">Selecciona la Base del Checklist Legal LCP <span className="text-xs bg-gray-100 text-gray-600 px-2 py-0.5 rounded">{selectedDocs.length} marcados</span></label>
+                    <div className="flex bg-blue-50/50 border border-blue-100 p-2 rounded-lg mb-3">
+                      <Info size={14} className="text-blue-500 mt-0.5 mr-2" />
+                      <p className="text-[10px] text-blue-800 font-medium">Nota: Los documentos marcados de fábrica como financieros llevarán auto-integrada la calculadora BCV dentro del expediente.</p>
+                    </div>
                     <div className="grid grid-cols-2 gap-3 mt-2">
                       {DOCUMENTOS_LCP.map((doc: DocumentoLCP) => {
                         const isSelected = selectedDocs.includes(doc.id);
                         return (
-                          <div key={doc.id} onClick={() => toggleDoc(doc.id)} className={`flex items-start gap-3 p-3 rounded-lg border cursor-pointer ${isSelected ? 'bg-indigo-50/50 border-indigo-200' : 'bg-white border-gray-200 hover:border-gray-300'}`}>
+                          <div key={doc.id} onClick={() => toggleDoc(doc.id)} className={`flex items-start gap-3 p-3 rounded-lg border cursor-pointer relative ${isSelected ? 'bg-indigo-50/50 border-indigo-200' : 'bg-white border-gray-200 hover:border-gray-300'}`}>
                             <div className={isSelected ? 'text-indigo-600' : 'text-gray-300'}>{isSelected ? <CheckCircle2 size={18} /> : <Circle size={18} />}</div>
-                            <span className={`text-xs font-medium leading-tight ${isSelected ? 'text-indigo-900' : 'text-slate-700'}`}>{doc.name}</span>
+                            <div className="flex flex-col">
+                              <span className={`text-xs font-medium leading-tight ${isSelected ? 'text-indigo-900' : 'text-slate-700'}`}>{doc.name}</span>
+                              {doc.preTipo !== "Ninguna" && <span className="text-[9px] font-bold text-emerald-600 mt-1 uppercase"><Calculator size={8} className="inline mr-0.5"/> Naturaleza Matemática</span>}
+                            </div>
                           </div>
                         )
                       })}
@@ -544,7 +690,6 @@ export default function Home() {
         </div>
       )}
 
-      {/* MODAL 2: Modal Documental Bóveda */}
       {isFileModalOpen && (
         <div className="absolute z-50 inset-0 -mx-8 -my-8 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center">
           <div className="bg-white rounded-2xl shadow-2xl w-[500px] flex flex-col p-6 animate-in slide-in-from-bottom-8 duration-300">
