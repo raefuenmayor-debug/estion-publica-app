@@ -56,7 +56,6 @@ export async function POST(request: Request) {
         last_name: nombre.split(' ').slice(1).join(' ') || '',
         email: email,
         role: rol,
-        avatar_url: iniciales
     })
 
     if (profileError) {
