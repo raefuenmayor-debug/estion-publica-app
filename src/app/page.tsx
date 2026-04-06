@@ -681,7 +681,7 @@ export default function Home() {
 
                 <div>
                   <label className="block text-sm font-semibold text-slate-700 mb-1.5 focus-within:text-indigo-600">Delegar a Analista Operativo</label>
-                  <select value={selectedAnalista} onChange={e => setSelectedAnalista(e.target.value === "" ? "" : Number(e.target.value))} className="w-full px-4 py-2 border border-gray-300 rounded-lg text-slate-800 focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 bg-white">
+                  <select value={selectedAnalista} onChange={e => setSelectedAnalista(e.target.value)} className="w-full px-4 py-2 border border-gray-300 rounded-lg text-slate-800 focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 bg-white">
                     <option value="">-- Sin asignar / Abierto --</option>
                     {analistasDB.map((a: any) => <option key={a.id} value={a.id}>{a.first_name || a.email} ({cargasPorAnalista[a.id]} expedientes en curso)</option>)}
                   </select>
