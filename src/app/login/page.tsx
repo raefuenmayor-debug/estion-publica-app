@@ -45,11 +45,10 @@ export default function LoginPage() {
           <div className="absolute top-0 right-0 w-32 h-32 bg-white/5 rounded-full -mr-10 -mt-10 blur-xl"></div>
           <div className="absolute bottom-0 left-0 w-24 h-24 bg-monday-blue/20 rounded-full -ml-8 -mb-8 blur-lg"></div>
           
-          <div className="mx-auto w-16 h-16 bg-white/10 rounded-xl flex items-center justify-center mb-4 backdrop-blur-sm border border-white/20">
-            <Shield size={32} className="text-white" />
+          <div className="mx-auto flex items-center justify-center mb-2 z-10 relative">
+            <img src="/concepto.png" alt="Logo COP Concepto" className="max-h-24 w-auto object-contain drop-shadow-lg" />
           </div>
-          <h1 className="text-2xl font-black text-white tracking-tight">COP</h1>
-          <p className="text-white/60 text-sm mt-2 font-medium">Control de Operaciones Públicas</p>
+          <p className="text-white/80 text-sm mt-3 font-medium relative z-10">Control de Operaciones Públicas</p>
         </div>
 
         {/* Formulario */}

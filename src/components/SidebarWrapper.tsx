@@ -1,14 +1,22 @@
 "use client";
 
 import React from 'react';
-import { usePathname } from 'next/navigation';
+import { usePathname, useRouter } from 'next/navigation';
+import { createClient } from '@/lib/supabase';
 
 export default function SidebarWrapper({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
+  const router = useRouter();
+  const supabase = createClient();
 
   if (pathname === '/login') {
     return <main className="w-full h-full min-h-screen">{children}</main>;
   }
+
+  const handleSignOut = async () => {
+    await supabase.auth.signOut();
+    router.push('/login');
+  };
 
   return (
     <div className="flex h-screen overflow-hidden relative">
@@ -34,11 +42,11 @@ export default function SidebarWrapper({ children }: { children: React.ReactNode
         </nav>
         
         <div className="p-4 border-t border-white/10">
-          <div className="flex items-center gap-3 px-3 py-2 cursor-pointer hover:bg-white/5 rounded-lg transition-colors">
-            <div className="w-8 h-8 rounded-full bg-gradient-to-tr from-purple-500 to-blue-500 flex items-center justify-center text-sm font-bold shadow-lg">A</div>
+          <div onClick={handleSignOut} className="flex items-center gap-3 px-3 py-2 cursor-pointer hover:bg-red-500/10 hover:text-red-300 rounded-lg transition-colors group">
+            <div className="w-8 h-8 rounded-full bg-gradient-to-tr from-purple-500 to-blue-500 flex items-center justify-center text-sm font-bold shadow-lg group-hover:from-red-500 group-hover:to-orange-500 transition-all">A</div>
             <div className="flex flex-col">
-              <span className="text-sm font-medium">Administrador</span>
-              <span className="text-xs text-white/50">Cerrar Sesión</span>
+              <span className="text-sm font-medium">Mi Perfil</span>
+              <span className="text-xs text-white/50 group-hover:text-red-300">Cerrar Sesión</span>
             </div>
           </div>
         </div>
