@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useMemo } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { Plus, X, Search, Filter, FileText, CheckCircle2, Circle, UploadCloud, File, LayoutGrid, Package, ChevronDown, ChevronRight, Trash2, Users, ShieldCheck, ArrowUp, ArrowDown, Calculator, AlertTriangle, Info } from 'lucide-react';
 
 type TipoFinanciero = "Ninguna" | "Presupuesto Base" | "Adjudicación" | "Disponibilidad" | "Contrato" | "Adenda";
@@ -39,7 +39,7 @@ const getColorEstado = (estado: string) => {
 };
 
 type SubProcesoType = {
-  id: number;
+  id: string;
   nombre: string;
   estado: string;
   vistoBueno: boolean;
@@ -51,36 +51,32 @@ type SubProcesoType = {
 };
 
 type ExpedienteType = {
-  id: number;
+  id: string;
   nombre: string;
   area: string;
-  analistaId?: number;
+  analistaId?: string;
   procesos: SubProcesoType[];
 };
 
-export default function Home() {
-  const [expedientes, setExpedientes] = useState<ExpedienteType[]>([
-    { 
-      id: 1, 
-      nombre: "LP-001 Compra de Insumos Médicos", 
-      area: "Contrataciones",
-      analistaId: 1,
-      procesos: [
-        { id: 101, nombre: "4. Presupuesto Base", estado: "Culminada", vistoBueno: true, archivosSubidosCount: 1, fecha: "2024-03-01", tipoFinanciero: "Presupuesto Base", montoUsd: 50000, tasaBcv: 36.25 },
-        { id: 102, nombre: "11. Adjudicación", estado: "En Revisión", vistoBueno: false, archivosSubidosCount: 0, fecha: "2024-03-05", tipoFinanciero: "Adjudicación", montoUsd: 0, tasaBcv: 36.25 }
-      ] 
-    }
-  ]);
+import { createClient } from '@/lib/supabase';
 
-  const [expandedRow, setExpandedRow] = useState<number | null>(1);
+export default function Home() {
+  const supabase = createClient();
+  const [session, setSession] = useState<any>(null);
+  const [currentUserProfile, setCurrentUserProfile] = useState<any>(null);
+  const [analistasDB, setAnalistasDB] = useState<any[]>([]);
+
+  const [expedientes, setExpedientes] = useState<ExpedienteType[]>([]);
+
+  const [expandedRow, setExpandedRow] = useState<string | null>(null);
   const [isNewTaskModalOpen, setIsNewTaskModalOpen] = useState<boolean>(false);
   const [isFileModalOpen, setIsFileModalOpen] = useState<boolean>(false);
-  const [activeIds, setActiveIds] = useState<{expId: number, procId: number} | null>(null);
-  const [analystModalOpen, setAnalystModalOpen] = useState<number | null>(null);
+  const [activeIds, setActiveIds] = useState<{expId: string, procId: string} | null>(null);
+  const [analystModalOpen, setAnalystModalOpen] = useState<string | null>(null);
 
   const [taskName, setTaskName] = useState<string>("");
   const [area, setArea] = useState<"Contrataciones" | "Bienes">("Contrataciones");
-  const [selectedAnalista, setSelectedAnalista] = useState<number | "">("");
+  const [selectedAnalista, setSelectedAnalista] = useState<string>("");
   const [selectedDocs, setSelectedDocs] = useState<number[]>([]);
   const [bienesTipo, setBienesTipo] = useState<string>("");
 
@@ -96,14 +92,55 @@ export default function Home() {
   const [files, setFiles] = useState<File[]>([]);
   const fileInputRef = React.useRef<HTMLInputElement>(null);
 
+  const fetchData = async (user: any) => {
+    const { data: profile } = await supabase.from('profiles').select('*').eq('id', user.id).single();
+    if(profile) setCurrentUserProfile(profile);
+
+    const { data: analistas } = await supabase.from('profiles').select('*').ilike('role', 'Analista%');
+    if(analistas) setAnalistasDB(analistas);
+
+    const { data: exps } = await supabase.from('expedientes').select('*, sub_procesos(*)').order('created_at', { ascending: false });
+    
+    if (exps) {
+      const mappedExps = exps.map((e:any) => ({
+        id: e.id,
+        nombre: e.nombre,
+        area: e.area,
+        analistaId: e.analista_id,
+        procesos: e.sub_procesos.sort((a:any, b:any) => a.orden_index - b.orden_index).map((p:any) => ({
+          id: p.id,
+          nombre: p.nombre,
+          estado: p.estado,
+          vistoBueno: p.visto_bueno,
+          archivosSubidosCount: p.archivos_subidos_count,
+          fecha: p.fecha_pautada,
+          tipoFinanciero: p.tipo_financiero,
+          montoUsd: p.monto_usd,
+          tasaBcv: p.tasa_bcv
+        }))
+      }));
+      setExpedientes(mappedExps);
+    }
+  };
+
+  useEffect(() => {
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      if (!session) window.location.href = '/login';
+      else {
+        setSession(session);
+        fetchData(session.user);
+      }
+    });
+  }, []);
+
   const cargasPorAnalista = useMemo(() => {
-    const cargas: Record<number, number> = {};
-    ANALISTAS.forEach((a: AnalistaType) => cargas[a.id] = 0);
+    const cargas: Record<string, number> = {};
+    analistasDB.forEach((a: any) => cargas[a.id] = 0);
     expedientes.forEach((exp: ExpedienteType) => {
-      if(exp.analistaId) cargas[exp.analistaId]++;
+      if(exp.analistaId && cargas[exp.analistaId] !== undefined) cargas[exp.analistaId]++;
     });
     return cargas;
-  }, [expedientes]);
+  }, [expedientes, analistasDB]);
 
   const totalVistosBuenos = useMemo(() => {
     let cant = 0;
@@ -117,47 +154,44 @@ export default function Home() {
     return procesos.filter(p => p.tipoFinanciero === tipo).reduce((acc, p) => acc + (p.montoUsd || 0), 0);
   };
 
-  const handleCreateExpediente = (e: React.FormEvent) => {
+  const handleCreateExpediente = async (e: React.FormEvent) => {
     e.preventDefault();
+    if(!session) return;
     
-    let subProcesos: SubProcesoType[] = [];
-    
+    const { data: nuevoExp, error } = await supabase.from('expedientes').insert({
+      nombre: taskName,
+      area: area,
+      analista_id: selectedAnalista || null,
+      created_by: session.user.id
+    }).select().single();
+
+    if (error || !nuevoExp) { alert("Error al crear expediente: " + error?.message); return; }
+
+    let subProcesosInsert: any[] = [];
     if(area === "Contrataciones") {
-      subProcesos = selectedDocs.map((docId: number) => {
+      subProcesosInsert = selectedDocs.map((docId: number, idx: number) => {
         const docInfo = DOCUMENTOS_LCP.find((d: DocumentoLCP) => d.id === docId);
         return {
-          id: Date.now() + Math.random(),
+          expediente_id: nuevoExp.id,
           nombre: docInfo ? docInfo.name : "Proceso",
-          estado: "Asignada",
-          vistoBueno: false,
-          archivosSubidosCount: 0,
-          fecha: "",
-          tipoFinanciero: docInfo?.preTipo || "Ninguna",
-          montoUsd: 0,
-          tasaBcv: 36.25  // Tasa genérica inicial demo
+          orden_index: idx,
+          tipo_financiero: docInfo?.preTipo || "Ninguna"
         };
       });
     } else {
-      subProcesos = [{
-        id: Date.now() + Math.random(),
+      subProcesosInsert = [{
+        expediente_id: nuevoExp.id,
         nombre: `Trámite: ${bienesTipo}`,
-        estado: "Asignada",
-        vistoBueno: false,
-        archivosSubidosCount: 0,
-        fecha: "",
-        tipoFinanciero: "Ninguna"
+        orden_index: 0,
+        tipo_financiero: "Ninguna"
       }];
     }
 
-    const nuevoExpediente: ExpedienteType = {
-      id: Date.now(),
-      nombre: taskName,
-      area: area,
-      analistaId: selectedAnalista !== "" ? Number(selectedAnalista) : undefined,
-      procesos: subProcesos
-    };
+    if (subProcesosInsert.length > 0) {
+       await supabase.from('sub_procesos').insert(subProcesosInsert);
+    }
     
-    setExpedientes([nuevoExpediente, ...expedientes]);
+    await fetchData(session.user);
     setIsNewTaskModalOpen(false);
     setSelectedDocs([]);
     setTaskName("");
@@ -165,35 +199,42 @@ export default function Home() {
     setBienesTipo("");
   };
 
-  const handleCycleStatus = (expId: number, procId: number) => {
-    setExpedientes((prev: ExpedienteType[]) => prev.map((exp: ExpedienteType) => {
-      if(exp.id !== expId) return exp;
-      return {
-        ...exp,
-        procesos: exp.procesos.map((proc: SubProcesoType) => {
-          if(proc.id !== procId) return proc;
-          const currentIndex = ESTADOS_CICLO.indexOf(proc.estado);
-          const nextIndex = (currentIndex + 1) % ESTADOS_CICLO.length;
-          return { ...proc, estado: ESTADOS_CICLO[nextIndex] };
-        })
-      };
-    }));
+  const handleCycleStatus = async (expId: string, procId: string) => {
+    const exp = expedientes.find(e => e.id === expId);
+    if(!exp) return;
+    const proc = exp.procesos.find(p => p.id === procId);
+    if(!proc) return;
+
+    if(currentUserProfile?.role.startsWith('Jefe')) {
+      alert("Nivel de Seguridad: Los Jefes evalúan actos mediante el Visto Bueno, no alteran su estado.");
+      return;
+    }
+
+    const currentIndex = ESTADOS_CICLO.indexOf(proc.estado);
+    const nextIndex = (currentIndex + 1) % ESTADOS_CICLO.length;
+    const nextEstado = ESTADOS_CICLO[nextIndex];
+
+    await supabase.from('sub_procesos').update({ estado: nextEstado }).eq('id', procId);
+    fetchData(session.user);
   };
 
-  const handleToggleVistoBueno = (expId: number, procId: number) => {
-    setExpedientes((prev: ExpedienteType[]) => prev.map((exp: ExpedienteType) => {
-      if(exp.id !== expId) return exp;
-      return {
-        ...exp,
-        procesos: exp.procesos.map((proc: SubProcesoType) => {
-          if(proc.id !== procId) return proc;
-          return { ...proc, vistoBueno: !proc.vistoBueno };
-        })
-      };
-    }));
+  const handleToggleVistoBueno = async (expId: string, procId: string) => {
+    const exp = expedientes.find(e => e.id === expId);
+    if(!exp) return;
+    const proc = exp.procesos.find(p => p.id === procId);
+    if(!proc) return;
+
+    if(!currentUserProfile?.role.startsWith('Jefe') && currentUserProfile?.role !== 'Administrador') {
+      alert("Sólo las Jefaturas tienen autonomía para impartir un Visto Bueno de verificación.");
+      return;
+    }
+
+    await supabase.from('sub_procesos').update({ visto_bueno: !proc.vistoBueno }).eq('id', procId);
+    fetchData(session.user);
   };
 
-  const handleChangeDate = (expId: number, procId: number, newDate: string) => {
+  const handleChangeDate = async (expId: string, procId: string, newDate: string) => {
+    await supabase.from('sub_procesos').update({ fecha_pautada: newDate }).eq('id', procId);
     setExpedientes((prev: ExpedienteType[]) => prev.map((exp: ExpedienteType) => {
       if(exp.id !== expId) return exp;
       return {
@@ -206,7 +247,9 @@ export default function Home() {
     }));
   };
 
-  const handleMontoChange = (expId: number, procId: number, field: 'montoUsd' | 'tasaBcv', value: number) => {
+  const handleMontoChange = async (expId: string, procId: string, field: 'montoUsd' | 'tasaBcv', value: number) => {
+    const dbField = field === 'montoUsd' ? 'monto_usd' : 'tasa_bcv';
+    await supabase.from('sub_procesos').update({ [dbField]: value }).eq('id', procId);
     setExpedientes((prev: ExpedienteType[]) => prev.map((exp: ExpedienteType) => {
       if(exp.id !== expId) return exp;
       return {
@@ -219,52 +262,47 @@ export default function Home() {
     }));
   };
 
-  const handleMoveProceso = (expId: number, index: number, direction: 'up' | 'down') => {
-    setExpedientes((prev: ExpedienteType[]) => prev.map((exp: ExpedienteType) => {
-      if(exp.id !== expId) return exp;
-      if (direction === 'up' && index === 0) return exp;
-      if (direction === 'down' && index === exp.procesos.length - 1) return exp;
-      
-      const newProcesos = [...exp.procesos];
-      const targetIndex = direction === 'up' ? index - 1 : index + 1;
-      
-      const temp = newProcesos[index];
-      newProcesos[index] = newProcesos[targetIndex];
-      newProcesos[targetIndex] = temp;
-      
-      return { ...exp, procesos: newProcesos };
-    }));
+  const handleMoveProceso = async (expId: string, index: number, direction: 'up' | 'down') => {
+    const exp = expedientes.find(e => e.id === expId);
+    if(!exp) return;
+    if (direction === 'up' && index === 0) return;
+    if (direction === 'down' && index === exp.procesos.length - 1) return;
+    
+    const targetIndex = direction === 'up' ? index - 1 : index + 1;
+    const currentProc = exp.procesos[index];
+    const targetProc = exp.procesos[targetIndex];
+    
+    // Swap orden_index on backend
+    await supabase.from('sub_procesos').update({ orden_index: targetIndex }).eq('id', currentProc.id);
+    await supabase.from('sub_procesos').update({ orden_index: index }).eq('id', targetProc.id);
+    
+    fetchData(session.user);
   };
 
-  const handleCreateSubProceso = (expId: number) => {
+  const handleCreateSubProceso = async (expId: string) => {
     if(!newProcessName.trim()) return;
-    setExpedientes((prev: ExpedienteType[]) => prev.map((exp: ExpedienteType) => {
-      if(exp.id !== expId) return exp;
-      return {
-        ...exp,
-        procesos: [...exp.procesos, { 
-          id: Date.now(), 
-          nombre: newProcessName, 
-          estado: "Asignada", 
-          vistoBueno: false, 
-          archivosSubidosCount: 0, 
-          fecha: newProcessDate,
-          tipoFinanciero: newProcessFinType,
-          montoUsd: newProcessFinType !== "Ninguna" ? 0 : undefined,
-          tasaBcv: newProcessFinType !== "Ninguna" ? 36.25 : undefined,
-        }]
-      };
-    }));
+    const exp = expedientes.find(e => e.id === expId);
+    if(!exp) return;
+
+    await supabase.from('sub_procesos').insert({
+      expediente_id: expId,
+      nombre: newProcessName,
+      orden_index: exp.procesos.length,
+      fecha_pautada: newProcessDate || null,
+      tipo_financiero: newProcessFinType,
+      monto_usd: newProcessFinType !== "Ninguna" ? 0 : 0,
+      tasa_bcv: newProcessFinType !== "Ninguna" ? 36.25 : 36.25
+    });
+
     setNewProcessName("");
     setNewProcessDate("");
     setNewProcessFinType("Ninguna");
+    fetchData(session.user);
   };
 
-  const handleDeleteSubProceso = (expId: number, procId: number) => {
-    setExpedientes((prev: ExpedienteType[]) => prev.map((exp: ExpedienteType) => {
-      if(exp.id !== expId) return exp;
-      return { ...exp, procesos: exp.procesos.filter((p: SubProcesoType) => p.id !== procId) };
-    }));
+  const handleDeleteSubProceso = async (expId: string, procId: string) => {
+    await supabase.from('sub_procesos').delete().eq('id', procId);
+    fetchData(session.user);
   };
 
   const handleFileInput = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -281,18 +319,19 @@ export default function Home() {
     }
   };
 
-  const uploadToStorage = () => {
-    if (activeIds !== null) {
-      setExpedientes((prev: ExpedienteType[]) => prev.map((exp: ExpedienteType) => {
-        if (exp.id !== activeIds.expId) return exp;
-        return {
-          ...exp,
-          procesos: exp.procesos.map((proc: SubProcesoType) => {
-            if(proc.id !== activeIds.procId) return proc;
-            return { ...proc, archivosSubidosCount: proc.archivosSubidosCount + files.length };
-          })
-        };
-      }));
+  const uploadToStorage = async () => {
+    if (activeIds !== null && files.length > 0) {
+      const proc = expedientes.find(e => e.id === activeIds.expId)?.procesos.find(p => p.id === activeIds.procId);
+      
+      for (const file of files) {
+        const fileExt = file.name.split('.').pop();
+        const fileName = `${activeIds.expId}/${activeIds.procId}_${Date.now()}.${fileExt}`;
+        const { error } = await supabase.storage.from('documentos_oficiales').upload(fileName, file);
+        if(error) alert(`Error subiendo ${file.name}: ${error.message}`);
+      }
+
+      await supabase.from('sub_procesos').update({ archivos_subidos_count: (proc?.archivosSubidosCount || 0) + files.length }).eq('id', activeIds.procId);
+      fetchData(session.user);
     }
     setIsFileModalOpen(false);
     setFiles([]);
@@ -315,13 +354,20 @@ export default function Home() {
             <Users size={16} /> Carga Operativa
           </div>
           <div className="flex gap-3">
-            {ANALISTAS.map((a: AnalistaType) => (
+            {analistasDB.map((a: any) => {
+              const bgColors = ['bg-pink-500', 'bg-cyan-500', 'bg-amber-500', 'bg-teal-500', 'bg-rose-500', 'bg-indigo-500'];
+              const bColor = bgColors[a.id.charCodeAt(0) % bgColors.length];
+              const nameParts = a.first_name ? [a.first_name, a.last_name] : [a.email];
+              const initials = nameParts[0].substring(0, 2).toUpperCase();
+
+              return (
               <div key={a.id} onClick={() => setAnalystModalOpen(a.id)} className="flex items-center gap-1.5 bg-gray-50 border border-gray-200 px-3 py-1.5 rounded-full cursor-pointer hover:bg-gray-100 transition-all active:scale-95">
-                <div className={`w-5 h-5 rounded-full flex items-center justify-center text-[10px] font-bold text-white ${a.color}`}>{a.iniciales}</div>
-                <span className="text-xs font-semibold text-slate-700">{a.nombre.split(' ')[0]}</span>
+                <div className={`w-5 h-5 rounded-full flex items-center justify-center text-[10px] font-bold text-white ${bColor}`}>{initials}</div>
+                <span className="text-xs font-semibold text-slate-700">{nameParts[0].split(' ')[0]}</span>
                 <span className={`text-xs font-black ${cargasPorAnalista[a.id] > 3 ? 'text-red-500' : 'text-slate-400'}`}>({cargasPorAnalista[a.id]})</span>
               </div>
-            ))}
+              );
+            })}
           </div>
         </div>
 
@@ -396,10 +442,10 @@ export default function Home() {
                   </div>
                   
                   <div className="w-[120px] px-3 flex items-center justify-center border-r border-gray-200/50">
-                     {analistaInfo ? (
-                        <div className="flex items-center gap-2 w-full justify-center" title={analistaInfo.nombre}>
-                          <div className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold text-white shadow-sm ${analistaInfo.color}`}>
-                            {analistaInfo.iniciales}
+                     {expediente.analistaId ? (
+                        <div className="flex items-center gap-2 w-full justify-center" title="Delegado">
+                          <div className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold text-white shadow-sm bg-blue-500`}>
+                            {analistasDB.find((a:any) => a.id === expediente.analistaId)?.first_name?.substring(0,2).toUpperCase() || 'OP'}
                           </div>
                         </div>
                      ) : (
@@ -644,7 +690,7 @@ export default function Home() {
                   <label className="block text-sm font-semibold text-slate-700 mb-1.5 focus-within:text-indigo-600">Delegar a Analista Operativo</label>
                   <select value={selectedAnalista} onChange={e => setSelectedAnalista(e.target.value === "" ? "" : Number(e.target.value))} className="w-full px-4 py-2 border border-gray-300 rounded-lg text-slate-800 focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 bg-white">
                     <option value="">-- Sin asignar / Abierto --</option>
-                    {ANALISTAS.map((a: AnalistaType) => <option key={a.id} value={a.id}>{a.nombre} ({cargasPorAnalista[a.id]} expedientes en curso)</option>)}
+                    {analistasDB.map((a: any) => <option key={a.id} value={a.id}>{a.first_name || a.email} ({cargasPorAnalista[a.id]} expedientes en curso)</option>)}
                   </select>
                 </div>
 
@@ -733,11 +779,11 @@ export default function Home() {
           <div className="bg-white rounded-2xl shadow-2xl w-[500px] flex flex-col p-6 animate-in fade-in zoom-in-95 duration-200">
             <div className="flex justify-between items-start border-b border-gray-100 pb-4 mb-4">
               <div className="flex items-center gap-3">
-                <div className={`w-10 h-10 rounded-full flex items-center justify-center text-sm font-bold text-white shadow-sm ${ANALISTAS.find((a: AnalistaType) => a.id === analystModalOpen)?.color}`}>
-                  {ANALISTAS.find((a: AnalistaType) => a.id === analystModalOpen)?.iniciales}
+                <div className={`w-10 h-10 rounded-full flex items-center justify-center text-sm font-bold text-white shadow-sm bg-blue-500`}>
+                  {analistasDB.find((a: any) => a.id === analystModalOpen)?.first_name?.substring(0, 2).toUpperCase() || 'OP'}
                 </div>
                 <div>
-                  <h3 className="text-lg font-bold text-slate-800">{ANALISTAS.find((a: AnalistaType) => a.id === analystModalOpen)?.nombre}</h3>
+                  <h3 className="text-lg font-bold text-slate-800">{analistasDB.find((a: any) => a.id === analystModalOpen)?.first_name || analistasDB.find((a: any) => a.id === analystModalOpen)?.email}</h3>
                   <p className="text-xs text-gray-500 font-medium">Asignaciones en curso: {cargasPorAnalista[analystModalOpen]}</p>
                 </div>
               </div>
