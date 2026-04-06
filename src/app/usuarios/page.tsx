@@ -3,24 +3,30 @@
 import React, { useState } from 'react';
 import { Users, UserPlus, Settings, MoreVertical, X, Mail, Shield, Check } from 'lucide-react';
 
-const ROLES_DISPONIBLES = ["Administrador", "Usuario-Contrataciones", "Usuario-Bienes"];
+const ROLES_DISPONIBLES = [
+  "Administrador",
+  "Jefe de Contrataciones",
+  "Jefe de Bienes",
+  "Analista de Contrataciones",
+  "Analista de Bienes"
+];
 
 // Datos falsos para el mockup
 const MOCK_USERS = [
   { id: 1, name: "Admin Total", email: "admin@gob.ve", role: "Administrador", initials: "A", color: "bg-purple-500" },
-  { id: 2, name: "Luis Fernandez", email: "l.fernandez@gob.ve", role: "Usuario-Contrataciones", initials: "LF", color: "bg-indigo-500" },
-  { id: 3, name: "Roberto Finol", email: "r.finol@gob.ve", role: "Usuario-Bienes", initials: "RF", color: "bg-sky-500" }
+  { id: 2, name: "Luis Fernandez", email: "l.fernandez@gob.ve", role: "Jefe de Contrataciones", initials: "LF", color: "bg-indigo-500" },
+  { id: 3, name: "Roberto Finol", email: "r.finol@gob.ve", role: "Analista de Bienes", initials: "RF", color: "bg-sky-500" }
 ];
 
 export default function UsuariosPage() {
   const [isModalOpen, setIsModalOpen] = useState(false);
-  const [newUser, setNewUser] = useState({ name: "", email: "", role: "Usuario-Contrataciones" });
+  const [newUser, setNewUser] = useState({ name: "", email: "", role: "Analista de Contrataciones" });
 
   const handleCreateUser = (e: React.FormEvent) => {
     e.preventDefault();
     alert(`Se registraría a ${newUser.name} como ${newUser.role} en la base de datos Supabase Auth y en la tabla Profiles.`);
     setIsModalOpen(false);
-    setNewUser({ name: "", email: "", role: "Usuario-Contrataciones" });
+    setNewUser({ name: "", email: "", role: "Analista de Contrataciones" });
   };
 
   return (
@@ -34,7 +40,7 @@ export default function UsuariosPage() {
         </h1>
         <button 
           onClick={() => setIsModalOpen(true)}
-          className="px-4 py-2 bg-monday-blue text-white text-sm font-bold rounded-lg shadow-sm hover:bg-opacity-90 transition-all flex items-center gap-2"
+          className="px-5 py-2 bg-gradient-to-r from-indigo-600 to-purple-600 text-white text-sm font-bold rounded-lg shadow-[0_4px_14px_0_rgba(79,70,229,0.39)] hover:-translate-y-0.5 transition-all flex items-center gap-2 border border-transparent"
         >
           <UserPlus size={16} strokeWidth={3} />
           Invitar Empleado
@@ -68,7 +74,7 @@ export default function UsuariosPage() {
               <div className="w-[200px] px-6 py-4 border-r border-gray-200/50 flex items-center justify-center">
                 <span className={`px-3 py-1 rounded-full text-xs font-bold ${
                   user.role === 'Administrador' ? 'bg-purple-100 text-purple-700' :
-                  user.role === 'Usuario-Contrataciones' ? 'bg-indigo-100 text-indigo-700' :
+                  user.role.startsWith('Jefe') ? 'bg-indigo-100 text-indigo-700' :
                   'bg-sky-100 text-sky-700'
                 }`}>
                   {user.role}
@@ -139,7 +145,9 @@ export default function UsuariosPage() {
                         <div className="flex flex-col">
                           <span className={`text-sm font-bold ${newUser.role === role ? 'text-monday-blue' : 'text-slate-700'}`}>{role}</span>
                           <span className="text-xs text-gray-400 font-medium">
-                            {role === 'Administrador' ? 'Control total corporativo' : `Acceso exclusivo al área de ${role.split('-')[1]}`}
+                            {role === 'Administrador' ? 'Control total corporativo' : 
+                             role.startsWith('Jefe') ? 'Aprueba actos (V.B) y asigna tareas (sin cambiar estatus)' :
+                             `Ejecuta y procesa la carga operativa de ${role.split('de ')[1]}`}
                           </span>
                         </div>
                         <div className={`w-5 h-5 rounded-full border-2 flex flex-col items-center justify-center ${newUser.role === role ? 'border-monday-blue bg-monday-blue' : 'border-gray-300'}`}>
