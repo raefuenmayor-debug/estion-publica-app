@@ -20,12 +20,8 @@ export default function RootLayout({
         <div className="flex h-screen overflow-hidden">
           {/* Sidebar */}
           <aside className="w-64 bg-[#292f4c] text-white flex flex-col transition-all duration-300">
-            <div className="h-16 flex items-center px-6 border-b border-white/10">
-              <span className="text-xl font-black tracking-tight text-white flex items-center gap-2">
-                <div className="w-4 h-4 rounded bg-monday-yellow"></div>
-                <div className="w-4 h-4 rounded bg-monday-green -ml-4 mt-4"></div>
-                COP
-              </span>
+            <div className="h-20 flex items-center px-4 border-b border-white/10 overflow-hidden bg-white/5 justify-center py-2">
+               <img src="/concepto.png" alt="Logo COP Concepto" className="max-h-16 w-auto object-contain drop-shadow-md" />
             </div>
             
             <nav className="flex-1 px-4 py-6 space-y-2">
