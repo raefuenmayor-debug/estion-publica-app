@@ -30,7 +30,9 @@ export async function POST(request: Request) {
       .single()
 
     if (!profile || profile.role !== 'Administrador') {
-      return NextResponse.json({ error: "Permisos insuficientes. Sólo un Administrador puede crear usuarios." }, { status: 403 })
+      return NextResponse.json({ 
+        error: `Permisos insuficientes. Tu rol actual es: '${profile?.role || "NINGUNO"}'. Se requiere 'Administrador'` 
+      }, { status: 403 })
     }
 
     // 3. Recibimos la data del nuevo usuario a crear
