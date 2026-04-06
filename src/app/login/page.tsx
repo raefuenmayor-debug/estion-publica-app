@@ -104,7 +104,7 @@ export default function LoginPage() {
               {loading ? (
                 <><Loader2 size={18} className="animate-spin" /> Verificando...</>
               ) : (
-                <>Ingresar al Sistema <ArrowRight size={18} /></>
+                <>ENTRAR <ArrowRight size={18} /></>
               )}
             </button>
           </form>
