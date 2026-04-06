@@ -45,21 +45,29 @@ export default function UsuariosPage() {
 
   const fetchData = async () => {
     setLoading(true);
-    // Verificar sesión y rol
+    // Verificar sesión (Para la UI base)
     const { data: { session } } = await supabase.auth.getSession();
-    if (session) {
-      const { data: miPerfil } = await supabase.from('profiles').select('*').eq('id', session.user.id).single();
-      if (miPerfil && miPerfil.role === 'Administrador') {
-        setIsAdmin(true);
+    
+    try {
+      // Llamar a nuestra API absoluta que salta cualquier RLS bloqueado
+      const res = await fetch('/api/users');
+      const json = await res.json();
+      
+      if (json.error) {
+        alert("Error de API: " + json.error);
+      } else {
+        setProfiles(json.profiles || []);
+        
+        // Revisar nosotros mismos si somos admin en base a esa lista ya bajada limpia
+        if (session) {
+           const me = json.profiles?.find((p: any) => p.id === session.user.id);
+           if (me && me.role === 'Administrador') setIsAdmin(true);
+        }
       }
+    } catch (err: any) {
+      alert("Error de conexión interno: " + err.message);
     }
-
-    // Traer todos los perfiles
-    const { data, error } = await supabase.from('profiles').select('*').order('created_at', { ascending: false });
-    if (error) {
-      alert("Error al cargar lista: " + error.message);
-    }
-    if (data) setProfiles(data);
+    
     setLoading(false);
   };
 

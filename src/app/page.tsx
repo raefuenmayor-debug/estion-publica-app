@@ -87,11 +87,22 @@ export default function Home() {
   const fileInputRef = React.useRef<HTMLInputElement>(null);
 
   const fetchData = async (user: any) => {
-    const { data: profile } = await supabase.from('profiles').select('*').eq('id', user.id).single();
-    if(profile) setCurrentUserProfile(profile);
-
-    const { data: analistas } = await supabase.from('profiles').select('*').ilike('role', 'Analista%');
-    if(analistas) setAnalistasDB(analistas);
+    try {
+      const res = await fetch('/api/users');
+      const json = await res.json();
+      
+      if (!json.error && json.profiles) {
+        const profile = json.profiles.find((p:any) => p.id === user.id);
+        if(profile) setCurrentUserProfile(profile);
+        
+        const analistas = json.profiles.filter((p:any) => p.role?.includes('Analista'));
+        if(analistas) setAnalistasDB(analistas);
+      } else {
+        console.error("API Fetch error:", json.error);
+      }
+    } catch(e) {
+      console.error(e);
+    }
 
     const { data: exps } = await supabase.from('expedientes').select('*, sub_procesos(*)').order('created_at', { ascending: false });
     
