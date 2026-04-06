@@ -17,13 +17,7 @@ const DOCUMENTOS_LCP: DocumentoLCP[] = [
   { id: 14, name: "Contrato o Módulo SUCOP", category: "Formalización", preTipo: "Contrato" }
 ];
 
-type AnalistaType = { id: number; nombre: string; iniciales: string; color: string; };
-const ANALISTAS: AnalistaType[] = [
-  { id: 1, nombre: "María Pérez", iniciales: "MP", color: "bg-pink-500" },
-  { id: 2, nombre: "Carlos López", iniciales: "CL", color: "bg-cyan-500" },
-  { id: 3, nombre: "Ana Gómez", iniciales: "AG", color: "bg-amber-500" },
-  { id: 4, nombre: "Luis Ramírez", iniciales: "LR", color: "bg-teal-500" }
-];
+
 
 const TIPOS_BIENES: string[] = ["Toma Física / Inventario General", "Ingreso / Alta de Bien", "Desincorporación / Baja", "Traspaso o Transferencia Interna", "Corrección de Seriales"];
 
@@ -420,7 +414,6 @@ export default function Home() {
             const isExpanded = expandedRow === expediente.id;
             const culminados = expediente.procesos.filter((p: SubProcesoType) => p.estado === 'Culminada').length;
             const isGlobalCompleted = expediente.procesos.length > 0 && culminados === expediente.procesos.length;
-            const analistaInfo = ANALISTAS.find((a: AnalistaType) => a.id === expediente.analistaId);
 
             const sPresupuesto = getSumaFinanciera(expediente.procesos, "Presupuesto Base");
             const sAdjudicacion = getSumaFinanciera(expediente.procesos, "Adjudicación");
