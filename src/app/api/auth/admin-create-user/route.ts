@@ -34,15 +34,17 @@ export async function POST(request: Request) {
     )
 
     // 3. Comprobamos que sea el Administrador Supremo real (Bypassing RLS con supabaseAdmin)
-    const { data: profile, error: errSelect } = await supabaseAdmin
+    const { data: profilesData, error: errSelect } = await supabaseAdmin
       .from('profiles')
       .select('role')
       .eq('id', session.user.id)
-      .single()
+      .limit(1)
+
+    const profile = profilesData?.[0]
 
     if (errSelect || !profile || profile.role !== 'Administrador') {
       return NextResponse.json({ 
-        error: `Permisos insuficientes. Tu rol actual es: '${profile?.role || "NINGUNO"}'. Se requiere 'Administrador'. (Detalle server: ${errSelect?.message || "Sin fila vinculada"})` 
+        error: `Permisos insuficientes. Tu rol actual es: '${profile?.role || "NINGUNO"}'. Se requiere 'Administrador'. (Detalle server: ${errSelect?.message || "Sin fila vinculada en BD"})` 
       }, { status: 403 })
     }
 

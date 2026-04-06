@@ -56,6 +56,9 @@ export default function UsuariosPage() {
 
     // Traer todos los perfiles
     const { data, error } = await supabase.from('profiles').select('*').order('created_at', { ascending: false });
+    if (error) {
+      alert("Error al cargar lista: " + error.message);
+    }
     if (data) setProfiles(data);
     setLoading(false);
   };
