@@ -1,7 +1,8 @@
 "use client";
 
-import React, { useState } from 'react';
-import { Users, UserPlus, Settings, MoreVertical, X, Mail, Shield, Check } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { Users, UserPlus, MoreVertical, X, Loader2, Shield, Lock } from 'lucide-react';
+import { createClient } from '@/lib/supabase';
 
 const ROLES_DISPONIBLES = [
   "Administrador",
@@ -11,22 +12,107 @@ const ROLES_DISPONIBLES = [
   "Analista de Bienes"
 ];
 
-// Datos falsos para el mockup
-const MOCK_USERS = [
-  { id: 1, name: "Admin Total", email: "admin@gob.ve", role: "Administrador", initials: "A", color: "bg-purple-500" },
-  { id: 2, name: "Luis Fernandez", email: "l.fernandez@gob.ve", role: "Jefe de Contrataciones", initials: "LF", color: "bg-indigo-500" },
-  { id: 3, name: "Roberto Finol", email: "r.finol@gob.ve", role: "Analista de Bienes", initials: "RF", color: "bg-sky-500" }
-];
+type Profile = {
+  id: string;
+  first_name: string;
+  last_name: string; // lo usamos para iniciales temporalmente en este diseño
+  email: string;
+  role: string;
+}
 
 export default function UsuariosPage() {
-  const [isModalOpen, setIsModalOpen] = useState(false);
-  const [newUser, setNewUser] = useState({ name: "", email: "", role: "Analista de Contrataciones" });
+  const [profiles, setProfiles] = useState<Profile[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [isAdmin, setIsAdmin] = useState(false);
 
-  const handleCreateUser = (e: React.FormEvent) => {
+  // Modal para Crear Empleado
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [newUser, setNewUser] = useState({ name: "", email: "", role: "Analista de Contrataciones", password: "", initials: "" });
+  const [creating, setCreating] = useState(false);
+  const [createError, setCreateError] = useState("");
+
+  // Modal para Cambiar Clave (El propio usuario)
+  const [isPwdModalOpen, setIsPwdModalOpen] = useState(false);
+  const [newPassword, setNewPassword] = useState("");
+  const [pwdUpdating, setPwdUpdating] = useState(false);
+  const [pwdMsg, setPwdMsg] = useState("");
+
+  const supabase = createClient();
+
+  useEffect(() => {
+    fetchData();
+  }, []);
+
+  const fetchData = async () => {
+    setLoading(true);
+    // Verificar sesión y rol
+    const { data: { session } } = await supabase.auth.getSession();
+    if (session) {
+      const { data: miPerfil } = await supabase.from('profiles').select('*').eq('id', session.user.id).single();
+      if (miPerfil && miPerfil.role === 'Administrador') {
+        setIsAdmin(true);
+      }
+    }
+
+    // Traer todos los perfiles
+    const { data, error } = await supabase.from('profiles').select('*').order('created_at', { ascending: false });
+    if (data) setProfiles(data);
+    setLoading(false);
+  };
+
+  const handleCreateUser = async (e: React.FormEvent) => {
     e.preventDefault();
-    alert(`Se registraría a ${newUser.name} como ${newUser.role} en la base de datos Supabase Auth y en la tabla Profiles.`);
-    setIsModalOpen(false);
-    setNewUser({ name: "", email: "", role: "Analista de Contrataciones" });
+    setCreating(true);
+    setCreateError("");
+
+    try {
+      const res = await fetch('/api/auth/admin-create-user', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          email: newUser.email,
+          password: newUser.password,
+          nombre: newUser.name,
+          rol: newUser.role,
+          iniciales: newUser.initials
+        })
+      });
+
+      const data = await res.json();
+      if (!res.ok) {
+        throw new Error(data.error || "Falla al crear el usuario. Verifica las env vars.");
+      }
+
+      // Éxito
+      alert(`¡Éxito! ${newUser.name} ha sido creado. Puede iniciar sesión con su contraseña.`);
+      setIsModalOpen(false);
+      setNewUser({ name: "", email: "", role: "Analista de Contrataciones", password: "", initials: "" });
+      fetchData(); // recargar lista
+    } catch (err: any) {
+      setCreateError(err.message);
+    } finally {
+      setCreating(false);
+    }
+  };
+
+  const handleUpdatePassword = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setPwdUpdating(true);
+    setPwdMsg("");
+
+    const { error } = await supabase.auth.updateUser({
+      password: newPassword
+    });
+
+    if (error) {
+      setPwdMsg("Error: " + error.message);
+    } else {
+      setPwdMsg("Contraseña actualizada exitosamente.");
+      setTimeout(() => {
+        setIsPwdModalOpen(false);
+      }, 2000);
+    }
+    setPwdUpdating(false);
   };
 
   return (
@@ -38,17 +124,30 @@ export default function UsuariosPage() {
           <Users size={28} className="text-monday-blue" />
           Directorio de Usuarios
         </h1>
-        <button 
-          onClick={() => setIsModalOpen(true)}
-          className="px-5 py-2 bg-gradient-to-r from-indigo-600 to-purple-600 text-white text-sm font-bold rounded-lg shadow-[0_4px_14px_0_rgba(79,70,229,0.39)] hover:-translate-y-0.5 transition-all flex items-center gap-2 border border-transparent"
-        >
-          <UserPlus size={16} strokeWidth={3} />
-          Invitar Empleado
-        </button>
+        
+        <div className="flex gap-3">
+          <button 
+            onClick={() => { setIsPwdModalOpen(true); setPwdMsg(""); setNewPassword(""); }}
+            className="px-4 py-2 bg-slate-100 text-slate-700 text-sm font-bold rounded-lg hover:bg-slate-200 transition-all flex items-center gap-2 border border-slate-200"
+          >
+            <Lock size={16} />
+            Cambiar Mi Contraseña
+          </button>
+
+          {isAdmin && (
+            <button 
+              onClick={() => setIsModalOpen(true)}
+              className="px-5 py-2 bg-gradient-to-r from-indigo-600 to-purple-600 text-white text-sm font-bold rounded-lg shadow-[0_4px_14px_0_rgba(79,70,229,0.39)] hover:-translate-y-0.5 transition-all flex items-center gap-2 border border-transparent"
+            >
+              <UserPlus size={16} strokeWidth={3} />
+              Invitar Empleado
+            </button>
+          )}
+        </div>
       </div>
 
       {/* Lista de Usuarios */}
-      <div className="bg-white rounded-xl shadow-[0_2px_10px_rgba(0,0,0,0.04)] border border-gray-200 overflow-hidden flex-1">
+      <div className="bg-white rounded-xl shadow-[0_2px_10px_rgba(0,0,0,0.04)] border border-gray-200 overflow-hidden flex-1 flex flex-col">
         
         {/* Cabecera Tabla */}
         <div className="flex w-full border-b border-gray-200 bg-gray-50/80 text-gray-500 text-sm font-semibold uppercase tracking-wider">
@@ -59,34 +158,42 @@ export default function UsuariosPage() {
         </div>
 
         {/* Filas */}
-        <div className="flex flex-col">
-          {MOCK_USERS.map((user) => (
-            <div key={user.id} className="flex w-full hover:bg-gray-50 transition-colors border-b border-gray-100 last:border-b-0 items-center">
-              <div className="flex-1 px-6 py-4 border-r border-gray-200/50 flex items-center gap-4">
-                <div className={`w-10 h-10 rounded-full ${user.color} flex items-center justify-center text-white text-sm font-bold shadow-sm`}>
-                  {user.initials}
+        <div className="flex flex-col flex-1 overflow-auto">
+          {loading ? (
+             <div className="p-10 flex justify-center text-gray-400"><Loader2 className="animate-spin" size={24}/></div>
+          ) : profiles.map((user) => {
+            const isBoss = user.role.startsWith('Jefe');
+            const isAdmin = user.role === 'Administrador';
+            const bgColor = isAdmin ? 'bg-purple-500' : isBoss ? 'bg-indigo-500' : 'bg-sky-500';
+
+            return (
+              <div key={user.id} className="flex w-full hover:bg-gray-50 transition-colors border-b border-gray-100 last:border-b-0 items-center">
+                <div className="flex-1 px-6 py-4 border-r border-gray-200/50 flex items-center gap-4">
+                  <div className={`w-10 h-10 rounded-full ${bgColor} flex items-center justify-center text-white text-sm font-bold shadow-sm`}>
+                    {user.last_name || user.first_name?.charAt(0) || "U"}
+                  </div>
+                  <span className="font-semibold text-slate-800 text-[15px]">{user.first_name || 'Sin Nombre'}</span>
                 </div>
-                <span className="font-semibold text-slate-800 text-[15px]">{user.name}</span>
+                <div className="w-[300px] px-6 py-4 border-r border-gray-200/50 text-slate-600 font-medium truncate">
+                  {user.email}
+                </div>
+                <div className="w-[200px] px-6 py-4 border-r border-gray-200/50 flex items-center justify-center">
+                  <span className={`px-3 py-1 rounded-full text-xs font-bold ${
+                    isAdmin ? 'bg-purple-100 text-purple-700' :
+                    isBoss ? 'bg-indigo-100 text-indigo-700' :
+                    'bg-sky-100 text-sky-700'
+                  }`}>
+                    {user.role}
+                  </span>
+                </div>
+                <div className="w-[100px] flex items-center justify-center">
+                  <button className="p-2 text-gray-400 hover:text-slate-700 hover:bg-gray-100 rounded-lg transition-colors">
+                    <MoreVertical size={18} />
+                  </button>
+                </div>
               </div>
-              <div className="w-[300px] px-6 py-4 border-r border-gray-200/50 text-slate-600 font-medium">
-                {user.email}
-              </div>
-              <div className="w-[200px] px-6 py-4 border-r border-gray-200/50 flex items-center justify-center">
-                <span className={`px-3 py-1 rounded-full text-xs font-bold ${
-                  user.role === 'Administrador' ? 'bg-purple-100 text-purple-700' :
-                  user.role.startsWith('Jefe') ? 'bg-indigo-100 text-indigo-700' :
-                  'bg-sky-100 text-sky-700'
-                }`}>
-                  {user.role}
-                </span>
-              </div>
-              <div className="w-[100px] flex items-center justify-center">
-                <button className="p-2 text-gray-400 hover:text-slate-700 hover:bg-gray-100 rounded-lg transition-colors">
-                  <MoreVertical size={18} />
-                </button>
-              </div>
-            </div>
-          ))}
+            )
+          })}
         </div>
       </div>
 
@@ -95,91 +202,141 @@ export default function UsuariosPage() {
         <div className="absolute z-50 inset-0 -mx-8 -my-8 bg-slate-900/40 backdrop-blur-sm flex items-center justify-center">
           <div className="bg-white rounded-2xl shadow-2xl w-[500px] flex flex-col overflow-hidden animate-in fade-in zoom-in-95 duration-200">
             
-            {/* Modal Header */}
             <div className="px-6 py-5 border-b border-gray-100 bg-slate-50/50 flex justify-between items-center">
-              <div>
-                <h3 className="text-xl font-black text-slate-800">Añadir Nuevo Empleado</h3>
-                <p className="text-xs font-semibold text-slate-500 mt-1">Se le enviará un correo de acceso al sistema</p>
-              </div>
-              <button onClick={() => setIsModalOpen(false)} className="text-gray-400 hover:bg-gray-200 p-2 rounded-full">
+              <h2 className="text-xl font-bold text-slate-800 flex items-center gap-2">
+                <Shield size={20} className="text-indigo-600" /> Nuevo Perfil Organizacional
+              </h2>
+              <button 
+                onClick={() => setIsModalOpen(false)}
+                className="p-1 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded-md transition-colors"
+              >
                 <X size={20} />
               </button>
             </div>
 
-            {/* Modal Body */}
-            <div className="px-6 py-6 pb-8">
-              <form id="user-form" onSubmit={handleCreateUser} className="space-y-5">
-                
-                <div>
-                  <label className="block text-sm font-semibold text-slate-700 mb-1.5 focus-within:text-monday-blue">Nombre Completo</label>
-                  <input 
-                    type="text" 
-                    required
+            <form onSubmit={handleCreateUser} className="px-6 py-6 flex flex-col gap-5">
+              
+              {createError && (
+                 <div className="p-3 bg-red-50 border border-red-200 text-red-600 text-sm font-semibold rounded-lg text-center">
+                   {createError}
+                 </div>
+              )}
+
+              <div className="grid grid-cols-2 gap-4">
+                <div className="col-span-2">
+                  <label className="block text-sm font-semibold text-slate-700 mb-1.5">Nombre Completo</label>
+                  <input
+                    type="text" required
                     value={newUser.name}
                     onChange={(e) => setNewUser({...newUser, name: e.target.value})}
-                    className="w-full px-4 py-2 bg-gray-50 border border-gray-200 rounded-lg text-slate-800 focus:outline-none focus:border-monday-blue focus:bg-white"
-                    placeholder="Ej. María Sánchez"
+                    placeholder="Ej. Roberto Finol"
+                    className="w-full px-4 py-2 border border-gray-300 rounded-lg text-slate-800 focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 bg-white"
                   />
                 </div>
-
-                <div>
-                  <label className="block text-sm font-semibold text-slate-700 mb-1.5 focus-within:text-monday-blue">Correo Institucional</label>
-                  <input 
-                    type="email" 
-                    required
+                <div className="col-span-1">
+                  <label className="block text-sm font-semibold text-slate-700 mb-1.5">Iniciales (Avatar)</label>
+                  <input
+                    type="text" required maxLength={2}
+                    value={newUser.initials}
+                    onChange={(e) => setNewUser({...newUser, initials: e.target.value.toUpperCase()})}
+                    placeholder="RF"
+                    className="w-full px-4 py-2 border border-gray-300 rounded-lg text-slate-800 focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 bg-white uppercase"
+                  />
+                </div>
+                <div className="col-span-1">
+                  <label className="block text-sm font-semibold text-slate-700 mb-1.5">Rol de Sistema</label>
+                  <select 
+                    value={newUser.role}
+                    onChange={(e) => setNewUser({...newUser, role: e.target.value})}
+                    className="w-full px-4 py-2 border border-gray-300 rounded-lg text-slate-800 focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 bg-white"
+                  >
+                    {ROLES_DISPONIBLES.map(r => <option key={r} value={r}>{r}</option>)}
+                  </select>
+                </div>
+                <div className="col-span-2 border-t border-gray-100 pt-3 mt-1">
+                  <label className="block text-sm font-semibold text-slate-700 mb-1.5">Correo Electrónico (Login)</label>
+                  <input
+                    type="email" required
                     value={newUser.email}
                     onChange={(e) => setNewUser({...newUser, email: e.target.value})}
-                    className="w-full px-4 py-2 bg-gray-50 border border-gray-200 rounded-lg text-slate-800 focus:outline-none focus:border-monday-blue focus:bg-white"
-                    placeholder="m.sanchez@institucion.gob.ve"
+                    placeholder="r.finol@gob.ve"
+                    className="w-full px-4 py-2 border border-gray-300 rounded-lg text-slate-800 focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 bg-white"
                   />
                 </div>
-
-                <div>
-                  <label className="block text-sm font-semibold text-slate-700 mb-2 mt-4 flex items-center gap-2">
-                    <Shield size={16} className="text-monday-orange" />
-                    Permisos y Rol del Sistema
-                  </label>
-                  <div className="space-y-2">
-                    {ROLES_DISPONIBLES.map((role) => (
-                      <label key={role} className={`flex items-center justify-between p-3 border rounded-lg cursor-pointer transition-all ${newUser.role === role ? 'border-monday-blue bg-blue-50/30' : 'border-gray-200 hover:bg-gray-50'}`}>
-                        <div className="flex flex-col">
-                          <span className={`text-sm font-bold ${newUser.role === role ? 'text-monday-blue' : 'text-slate-700'}`}>{role}</span>
-                          <span className="text-xs text-gray-400 font-medium">
-                            {role === 'Administrador' ? 'Control total corporativo' : 
-                             role.startsWith('Jefe') ? 'Aprueba actos (V.B) y asigna tareas (sin cambiar estatus)' :
-                             `Ejecuta y procesa la carga operativa de ${role.split('de ')[1]}`}
-                          </span>
-                        </div>
-                        <div className={`w-5 h-5 rounded-full border-2 flex flex-col items-center justify-center ${newUser.role === role ? 'border-monday-blue bg-monday-blue' : 'border-gray-300'}`}>
-                          {newUser.role === role && <Check size={12} className="text-white" strokeWidth={3} />}
-                        </div>
-                      </label>
-                    ))}
-                  </div>
+                <div className="col-span-2">
+                  <label className="block text-sm font-semibold text-slate-700 mb-1.5">Asignar Contraseña Temporal</label>
+                  <input
+                    type="text" required minLength={6}
+                    value={newUser.password}
+                    onChange={(e) => setNewUser({...newUser, password: e.target.value})}
+                    placeholder="Escribe la contraseña que le darás al usuario"
+                    className="w-full px-4 py-2 border border-gray-300 rounded-lg text-slate-800 focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 bg-white"
+                  />
+                  <p className="text-xs text-gray-500 mt-1">El usuario podrá cambiarla desde su cuenta luego.</p>
                 </div>
+              </div>
 
-              </form>
-            </div>
+              <div className="flex gap-3 justify-end mt-2">
+                <button
+                  type="button"
+                  onClick={() => setIsModalOpen(false)}
+                  className="px-5 py-2 rounded-lg text-slate-600 font-bold hover:bg-slate-100 transition-colors"
+                >
+                  Cancelar
+                </button>
+                <button
+                  type="submit" disabled={creating}
+                  className="px-5 py-2 bg-indigo-600 text-white font-bold rounded-lg hover:bg-indigo-700 transition-colors shadow-md shadow-indigo-600/20 flex gap-2 items-center"
+                >
+                  {creating ? <Loader2 size={18} className="animate-spin"/> : "Generar y Guardar Perfil"}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
 
-            {/* Modal Footer */}
-            <div className="px-6 py-4 bg-gray-50 border-t border-gray-200 flex justify-end gap-3">
+      {/* Modal Cambiar Contraseña */}
+      {isPwdModalOpen && (
+        <div className="absolute z-50 inset-0 -mx-8 -my-8 bg-slate-900/40 backdrop-blur-sm flex items-center justify-center">
+          <div className="bg-white rounded-2xl shadow-2xl w-[400px] flex flex-col overflow-hidden animate-in zoom-in-95 duration-200">
+            <div className="px-6 py-5 border-b border-gray-100 bg-slate-50/50 flex justify-between items-center">
+              <h2 className="text-xl font-bold text-slate-800 flex items-center gap-2">
+                <Lock size={20} className="text-slate-600" /> Cambio de Clave
+              </h2>
               <button 
-                type="button" 
-                onClick={() => setIsModalOpen(false)}
-                className="px-4 py-2 text-sm font-semibold text-slate-600 hover:bg-gray-200 rounded-lg"
+                onClick={() => setIsPwdModalOpen(false)}
+                className="p-1 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded-md transition-colors"
               >
-                Cancelar
-              </button>
-              <button 
-                type="submit" 
-                form="user-form"
-                disabled={!newUser.name || !newUser.email}
-                className="px-6 py-2 bg-monday-blue text-white text-sm font-semibold rounded-lg hover:bg-opacity-90 disabled:opacity-50"
-              >
-                Enviar Invitación
+                <X size={20} />
               </button>
             </div>
+            <form onSubmit={handleUpdatePassword} className="px-6 py-6 flex flex-col gap-4">
+              
+              {pwdMsg && (
+                 <div className={`p-3 text-sm font-semibold rounded-lg text-center ${pwdMsg.includes('Error') ? 'bg-red-50 text-red-600 border border-red-200' : 'bg-green-50 text-green-600 border border-green-200'}`}>
+                   {pwdMsg}
+                 </div>
+              )}
 
+              <div>
+                <label className="block text-sm font-semibold text-slate-700 mb-1.5">Escribe la Nueva Contraseña Segura</label>
+                <input
+                  type="password" required minLength={6}
+                  value={newPassword}
+                  onChange={(e) => setNewPassword(e.target.value)}
+                  placeholder="••••••••"
+                  className="w-full px-4 py-2 border border-gray-300 rounded-lg text-slate-800 focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 bg-white"
+                />
+              </div>
+
+              <button
+                  type="submit" disabled={pwdUpdating || !newPassword}
+                  className="px-5 py-2 mt-2 bg-slate-800 text-white font-bold rounded-lg hover:bg-slate-900 transition-colors flex gap-2 items-center justify-center disabled:opacity-50"
+                >
+                  {pwdUpdating ? <Loader2 size={18} className="animate-spin"/> : "Actualizar Contraseña Ahora"}
+                </button>
+            </form>
           </div>
         </div>
       )}
