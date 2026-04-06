@@ -304,7 +304,7 @@ export default function Home() {
   };
 
   return (
-    <div className="w-full h-full flex flex-col gap-6 relative">
+    <div className="w-full min-h-full flex flex-col gap-6 relative pb-12">
       
       {/* Indicadores Superiores */}
       <div className="flex justify-between items-center">
@@ -354,8 +354,9 @@ export default function Home() {
       </div>
 
       {/* Tabla Maestro-Detalle */}
-      <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
-        <div className="bg-transparent px-2 py-3 flex items-center border-b-[3px] border-b-indigo-500 group">
+      <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-x-auto overflow-y-visible">
+        <div className="min-w-[1160px] inline-block w-full">
+          <div className="bg-transparent px-2 py-3 flex items-center border-b-[3px] border-b-indigo-500 group">
           <div className="w-[30px] flex justify-center cursor-pointer text-indigo-500"><LayoutGrid size={16} /></div>
           <h2 className="text-indigo-500 font-semibold text-lg flex-1">Expedientes de Contratación Activos</h2>
           <span className="text-gray-400 font-medium text-sm pr-4">{expedientes.length} Registros Oficiales</span>
@@ -607,6 +608,7 @@ export default function Home() {
               <p>No hay Expedientes Activos Oficiales</p>
             </div>
           )}
+        </div>
         </div>
       </div>
 
