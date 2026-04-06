@@ -42,7 +42,7 @@ export async function POST(request: Request) {
 
     const profile = profilesData?.[0]
 
-    if (errSelect || !profile || profile.role !== 'Administrador') {
+        if (errSelect || !profile || profile.role !== 'Administrador') {
       return NextResponse.json({ 
         error: `Permisos insuficientes. Tu rol actual es: '${profile?.role || "NINGUNO"}'. Se requiere 'Administrador'. (Detalle server: ${errSelect?.message || "Sin fila vinculada en BD"})` 
       }, { status: 403 })
