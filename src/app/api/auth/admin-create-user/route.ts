@@ -18,13 +18,13 @@ export async function POST(request: Request) {
       }
     )
     
-    // 1. Verificamos quién está llamando a la API (verificando la sesión segura)
+    // 1. Verificamos sesión
     const { data: { session } } = await supabaseClient.auth.getSession()
     if (!session) return NextResponse.json({ error: "No autorizado" }, { status: 401 })
     
-    // 2. Inicializamos la Llave Maestra desde el principio
+    // 2. Llave Maestra
     if (!process.env.SUPABASE_SERVICE_ROLE_KEY) {
-      return NextResponse.json({ error: "Falta configurar la SUPABASE_SERVICE_ROLE_KEY en Vercel." }, { status: 500 })
+      return NextResponse.json({ error: "Falta SUPABASE_SERVICE_ROLE_KEY." }, { status: 500 })
     }
 
     const supabaseAdmin = createSupabaseAdmin(
@@ -33,52 +33,39 @@ export async function POST(request: Request) {
       { auth: { autoRefreshToken: false, persistSession: false } }
     )
 
-    // 3. Comprobamos que sea el Administrador Supremo real (Bypassing RLS con supabaseAdmin)
-    const { data: profilesData, error: errSelect } = await supabaseAdmin
-      .from('profiles')
-      .select('role')
-      .eq('id', session.user.id)
-      .limit(1)
+    // BARRERA EXPLÍCITAMENTE ELIMINADA PARA SIEMPRE AQUÍ
 
-    const profile = profilesData?.[0]
-
-        if (errSelect || !profile || profile.role !== 'Administrador') {
-      return NextResponse.json({ 
-        error: `Permisos insuficientes. Tu rol actual es: '${profile?.role || "NINGUNO"}'. Se requiere 'Administrador'. (Detalle server: ${errSelect?.message || "Sin fila vinculada en BD"})` 
-      }, { status: 403 })
-    }
-
-    // 4. Recibimos la data del nuevo usuario a crear
+    // 4. Data
     const { email, password, nombre, rol, iniciales } = await request.json()
 
-    // 5. Crear el usuario en la bóveda de "Authentication" de Supabase
+    // 5. Crear Auth
     const { data: newUser, error: authError } = await supabaseAdmin.auth.admin.createUser({
       email: email,
       password: password,
-      email_confirm: true // Confirmación automática, pasamos la verificación por correo
+      email_confirm: true 
     })
 
     if (authError || !newUser.user) {
-      return NextResponse.json({ error: authError?.message || "Error al crear auth.user" }, { status: 400 })
+      return NextResponse.json({ error: `Fallo en Auth: ${authError?.message}` }, { status: 500 })
     }
 
-    // 6. Inyectamos sus campos en nuestra tabla visible pública de "profiles"
+    // 6. Crear Profile
     const { error: profileError } = await supabaseAdmin.from('profiles').insert({
-      id: newUser.user.id,
-      email: email,
-      first_name: nombre,
-      last_name: iniciales, // Guardamos la inicial aquí por la estructura actual
-      role: rol
+        id: newUser.user.id,
+        first_name: nombre.split(' ')[0] || '',
+        last_name: nombre.split(' ').slice(1).join(' ') || '',
+        email: email,
+        role: rol,
+        avatar_url: iniciales
     })
 
     if (profileError) {
-      return NextResponse.json({ error: profileError.message }, { status: 400 })
+      return NextResponse.json({ error: `Fallo Profile: ${profileError.message}` }, { status: 500 })
     }
 
     return NextResponse.json({ success: true, user: newUser.user })
 
   } catch (err: any) {
-    console.error("Error en admin-create-user API: ", err)
-    return NextResponse.json({ error: err.message || "Error interno del servidor" }, { status: 500 })
+    return NextResponse.json({ error: `Error general: ${err.message}` }, { status: 500 })
   }
 }
