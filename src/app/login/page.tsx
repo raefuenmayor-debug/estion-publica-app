@@ -110,7 +110,7 @@ export default function LoginPage() {
           </form>
 
           <p className="mt-8 text-center text-xs font-semibold text-gray-400">
-            Acceso restringido para personal autorizado de Mantenimiento y Contrataciones Públicas.
+            DESARROLLADO POR: Advice and Consulting Group Venezuela
           </p>
         </div>
       </div>
