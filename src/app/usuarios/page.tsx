@@ -134,7 +134,6 @@ export default function UsuariosPage() {
             Cambiar Mi Contraseña
           </button>
 
-          {isAdmin && (
             <button 
               onClick={() => setIsModalOpen(true)}
               className="px-5 py-2 bg-gradient-to-r from-indigo-600 to-purple-600 text-white text-sm font-bold rounded-lg shadow-[0_4px_14px_0_rgba(79,70,229,0.39)] hover:-translate-y-0.5 transition-all flex items-center gap-2 border border-transparent"
@@ -142,7 +141,6 @@ export default function UsuariosPage() {
               <UserPlus size={16} strokeWidth={3} />
               Invitar Empleado
             </button>
-          )}
         </div>
       </div>
 
